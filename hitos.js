@@ -163,6 +163,9 @@
     { name: 'Estadio Santiago Bernabéu', at: [-3.68835, 40.45306], probes: grid3(75), r: 260, h: 48, wall: '#d6dbe0', roof: '#2f353c', roofT: 9, zoom: 16.6, info: 'Estadio del Real Madrid · inaugurado en 1947' }
   ];
   const ALL = HITOS.concat(DYN);
+  const TOWERS = [];
+  ALL.forEach((L, k) => { if (L.osm) TOWERS.push(k); });
+  const diag = {};   // qué ha leído el mapa de cada sitio (para el panel «Diagnóstico»)
   /* geometría sobre lon/lat */
   const ringArea = r => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += r[j][0] * r[i][1] - r[i][0] * r[j][1]; return a / 2; };
   function inRing(p, r) {
@@ -259,9 +262,11 @@
   function captureOne(map, L0, k) {
     const L = siteOf(L0);
     const q = f => { try { return map.querySourceFeatures('ofm', { sourceLayer: 'building', filter: f }); } catch (e) { return []; } };
-    let feats = q(['<', ['distance', { type: 'Point', coordinates: L.at }], L.r || 150]);
+    let feats = q(['<', ['distance', { type: 'Point', coordinates: L.at }], (L.r || 150) + 60]);
+    let viaDistance = feats.length > 0;
     if (!feats.length) feats = q(['>', ['coalesce', ['get', 'render_height'], 0], 10]);
     const cand = new Map();
+    // 1) partes que contienen alguno de los puntos de prueba (cuerpos apilados, contorno, podio…)
     L.probes.forEach(o => {
       const pt = [L.at[0] + o[0] / KLON, L.at[1] + o[1] / KLAT];
       feats.forEach(f => {
@@ -273,6 +278,28 @@
         });
       });
     });
+    // 2) torres: cuerpos altos cuyo centro está más cerca de esta torre que de cualquier otra (aunque la posición no sea exacta)
+    let tall = 0;
+    if (L.band) {
+      feats.forEach(f => {
+        if (f.properties && f.properties.hide_3d) return;
+        const h = +f.properties.render_height || 0;
+        if (h < L.h * 0.55) return;
+        polysOf(f.geometry).forEach(poly => {
+          const c = centroid(poly);
+          let bestK = -1, bestD = 1e9;
+          TOWERS.forEach(tk => {
+            const T = ALL[tk], d = Math.hypot((c[0] - T.at[0]) * KLON, (c[1] - T.at[1]) * KLAT);
+            if (d < bestD) { bestD = d; bestK = tk; }
+          });
+          if (bestK !== k || bestD > 130) return;
+          const key = keyOf(poly);
+          if (!cand.has(key)) { cand.set(key, { poly: poly, a: Math.abs(ringArea(poly[0])), h: h, m: +f.properties.render_min_height || 0 }); tall++; }
+        });
+      });
+    }
+    const hs = []; cand.forEach(c => { const v = Math.round(c.h); if (hs.indexOf(v) < 0 && hs.length < 8) hs.push(v); });
+    diag[k] = { feats: feats.length, via: viaDistance ? 'distance' : 'altura', cand: cand.size, tall: tall, hs: hs, out: 0 };
     if (!cand.size) return [];
     const out = [];
     let big = null, hBig = L.h, hMax = 0;
@@ -292,6 +319,7 @@
       } else out.push(dynFeat(k, p, c.m, h + 0.3, L.wall));
     });
     if (L.extra && EXTRAS[L.extra] && big) EXTRAS[L.extra](L, k, big, hBig, out);
+    diag[k].out = out.length;
     return out;
   }
 
@@ -299,5 +327,5 @@
   const SITES = [];
   ALL.forEach((L, k) => { if (L.osm || L.probes) SITES.push(k); });
 
-  window.VT = { KLON: KLON, KLAT: KLAT, HITOS: HITOS, DYN: DYN, ALL: ALL, HITOS_GEO: HITOS_GEO, SITES: SITES, captureOne: captureOne };
+  window.VT = { KLON: KLON, KLAT: KLAT, HITOS: HITOS, DYN: DYN, ALL: ALL, HITOS_GEO: HITOS_GEO, SITES: SITES, captureOne: captureOne, diag: diag };
 })();
