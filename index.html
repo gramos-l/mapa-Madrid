@@ -116,6 +116,11 @@
   .sheet h3 { margin: 16px 0 2px; font-size: 14px; }
   .note { color: var(--muted); font-size: 12.5px; margin: 12px 0 0; }
   .link-src { margin-top: 10px; font-size: 13px; }
+  .photo { display: block; width: 100%; height: 150px; object-fit: cover; border-radius: 12px; margin: 4px 0 12px; background: var(--line); }
+  input[type=range] { accent-color: var(--accent); width: 100%; margin: 4px 0 0; }
+  .sheet.open { animation: sheet-up .22s ease-out; }
+  @keyframes sheet-up { from { transform: translateY(14px); opacity: .6; } to { transform: none; opacity: 1; } }
+  @media (min-width: 700px) { .sheet.open { animation-name: sheet-up-d; } @keyframes sheet-up-d { from { opacity: .6; } to { opacity: 1; } } }
 
   /* Lista */
   #search { width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; margin: 6px 0 8px; }
@@ -146,6 +151,8 @@
   <div id="hudbody">
     <div id="stats">zoom 12.0 · inclinación 0°</div>
     <div class="row"><label><input type="checkbox" id="auto" checked> Inclinar al acercar</label></div>
+    <div class="row" style="display:block"><label for="hscale" style="display:flex;justify-content:space-between">Altura de edificios <output id="hscaleOut">×1,0</output></label>
+      <input type="range" id="hscale" min="0.5" max="2" step="0.1" value="1" aria-label="Altura de los edificios"></div>
     <div class="row">
       <button id="theme" type="button">Modo oscuro</button>
       <button id="reset" type="button">Vista general</button>
@@ -214,7 +221,8 @@
     order: 'Qué pedir', price: 'Precio orientativo', priceState: 'Estado del precio', prio: 'Prioridad',
     notes: 'Notas', src: 'Enlace / fuente', est: 'Estimación 2 pers. (€)', date: 'Fecha visita',
     spent: 'Gasto real 2 pers. (€)', rv: 'Nota vermut (1-5)', rt: 'Nota tapa (1-5)', ra: 'Nota ambiente (1-5)',
-    avg: 'Nota media', again: '¿Repetiríamos?', insta: 'Post Instagram (enlace)', lat: 'Latitud', lon: 'Longitud'
+    avg: 'Nota media', again: '¿Repetiríamos?', insta: 'Post Instagram (enlace)', lat: 'Latitud', lon: 'Longitud',
+    photo: 'Foto (enlace)'   // opcional: URL de una imagen para la ficha
   };
 
   /* ================== UTILIDADES ================== */
@@ -234,8 +242,7 @@
 
   /* ====== HITOS DE MADRID: modelos 3D (editables) ======
      Cada hito: posición real (lon, lat) y una lista de piezas.
-     Medidas en metros. z0/z1 = altura inferior/superior de cada pieza.
-     band = franjas horizontales (pisos / cristal): h = alto de cada franja, c = color de la línea. */
+     Medidas en metros. z0/z1 = altura inferior/superior de cada pieza. */
   const KLON = 84860, KLAT = 111040;             // metros por grado en Madrid
   const HITOS = [
     { name: 'Torre de Cristal', at: [-3.687555, 40.47823], info: '249 m · 2008 · César Pelli', parts: [
@@ -525,6 +532,8 @@
     dynBusy = false;
   }
 
+  const H_EXPR = ['coalesce', ['get', 'render_height'], 8];
+  const MINH_EXPR = ['coalesce', ['get', 'render_min_height'], 0];
   const HIDE_OSM_FROM = 101;   // los edificios de más de 100 m del mapa base se ocultan: los dibujamos nosotros
 
   /* ================== ESTILO DEL MAPA (mínimo, rápido) ================== */
@@ -538,12 +547,11 @@
       : { bg: '#eeece6', green: '#d3e4c4', water: '#a9cbea', casing: '#d6d1c5', minor: '#ffffff', major: '#ffffff', motor: '#fbe9c9', foot: '#e0dcd2',
           cols: [0, '#dfe3ea', 40, '#b9c6e8', 100, '#7f9be0', 150, '#4a63c7', 220, '#2b2f7a'] };
     const wd = b => ['interpolate', ['exponential', 1.5], ['zoom'], 10, b * 0.15, 14, b, 18, b * 8];
-    const h = ['coalesce', ['get', 'render_height'], 8];
-    const minH = ['coalesce', ['get', 'render_min_height'], 0];
+    const h = H_EXPR, minH = MINH_EXPR;
     const S = 'ofm';
     return {
       version: 8, name: 'madrid-3d',
-      sources: { ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' }, vermuterias: { type: 'geojson', data: geojson() }, hitos: { type: 'geojson', data: HITOS_GEO }, hitosdyn: { type: 'geojson', data: dynGeo() } },
+      sources: { ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' }, vermuterias: { type: 'geojson', data: geojson(), cluster: true, clusterRadius: 46, clusterMaxZoom: 14 }, hitos: { type: 'geojson', data: HITOS_GEO }, hitosdyn: { type: 'geojson', data: dynGeo() } },
       light: { anchor: 'viewport', position: [1.4, 215, 35], color: dk ? '#9fb0d8' : '#ffffff', intensity: dk ? 0.35 : 0.42 },
       layers: [
         { id: 'fondo', type: 'background', paint: { 'background-color': C.bg } },
@@ -563,26 +571,28 @@
         { id: 'edificios-3d', type: 'fill-extrusion', source: S, 'source-layer': 'building', minzoom: EXTRUDE_FROM,
           filter: ['all', ['!=', ['get', 'hide_3d'], true], ['<', h, HIDE_OSM_FROM]],
           paint: {
-            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], EXTRUDE_FROM, 0, EXTRUDE_FULL, h],
-            'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], EXTRUDE_FROM, 0, EXTRUDE_FULL, minH],
+            'fill-extrusion-height': hx(h),
+            'fill-extrusion-base': hx(minH),
             'fill-extrusion-color': ['interpolate', ['linear'], h].concat(C.cols),
             'fill-extrusion-opacity': 1, 'fill-extrusion-vertical-gradient': false
           } },
         { id: 'hitos-3d', type: 'fill-extrusion', source: 'hitos', minzoom: EXTRUDE_FROM,
           paint: {
-            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], EXTRUDE_FROM, 0, EXTRUDE_FULL, ['get', 'h']],
-            'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], EXTRUDE_FROM, 0, EXTRUDE_FULL, ['get', 'b']],
+            'fill-extrusion-height': hx(['get', 'h']),
+            'fill-extrusion-base': hx(['get', 'b']),
             'fill-extrusion-color': ['get', 'c'],
             'fill-extrusion-opacity': 1, 'fill-extrusion-vertical-gradient': true
           } },
         { id: 'hitos-dyn-3d', type: 'fill-extrusion', source: 'hitosdyn', minzoom: EXTRUDE_FROM,
           paint: {
-            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], EXTRUDE_FROM, 0, EXTRUDE_FULL, ['get', 'h']],
-            'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], EXTRUDE_FROM, 0, EXTRUDE_FULL, ['get', 'b']],
+            'fill-extrusion-height': hx(['get', 'h']),
+            'fill-extrusion-base': hx(['get', 'b']),
             'fill-extrusion-color': ['get', 'c'],
             'fill-extrusion-opacity': 1, 'fill-extrusion-vertical-gradient': true
           } },
-        { id: 'pins', type: 'symbol', source: 'vermuterias', filter: pinFilter(),
+        { id: 'pin-clusters', type: 'symbol', source: 'vermuterias', filter: ['has', 'point_count'],
+          layout: { 'icon-image': ['concat', 'cl-', ['to-string', ['get', 'point_count']]], 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
+        { id: 'pins', type: 'symbol', source: 'vermuterias', filter: UNCLUSTERED,
           layout: { 'icon-image': PIN_IMG, 'icon-anchor': 'bottom', 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
         { id: 'pin-sel', type: 'symbol', source: 'vermuterias', filter: selFilter(sel ? sel.idx : null),
           layout: { 'icon-image': PIN_IMG, 'icon-anchor': 'bottom', 'icon-size': 1.35, 'icon-allow-overlap': true, 'icon-ignore-placement': true } }
@@ -590,17 +600,19 @@
     };
   }
 
-  let theme = 'light', auto = true, userMoved = false;
+  let theme = 'light', auto = true, userMoved = false, hScale = 1;
+  // altura de extrusión: crece con el zoom y se multiplica por el control «Altura de edificios»
+  const hx = v => ['interpolate', ['linear'], ['zoom'], EXTRUDE_FROM, 0, EXTRUDE_FULL, ['*', v, hScale]];
   let places = [], filter = 'all', sel = null;
 
   /* ---- Chinchetas dibujadas por el propio mapa (GPU): mucho más fluido que elementos HTML ---- */
   function geojson() {
-    return { type: 'FeatureCollection', features: places.filter(p => p.located).map(p => ({
+    return { type: 'FeatureCollection', features: places.filter(p => p.located && match(p)).map(p => ({
       type: 'Feature', properties: { idx: p.idx, done: p.visited, approx: p.approx },
       geometry: { type: 'Point', coordinates: [p.lon, p.lat] } })) };
   }
-  const pinFilter = () => filter === 'todo' ? ['==', ['get', 'done'], false] : filter === 'done' ? ['==', ['get', 'done'], true] : ['all'];
-  const selFilter = i => ['==', ['get', 'idx'], i == null ? -1 : i];
+  const UNCLUSTERED = ['!', ['has', 'point_count']];
+  const selFilter = i => ['all', UNCLUSTERED, ['==', ['get', 'idx'], i == null ? -1 : i]];
   const PIN_IMG = ['concat', ['case', ['get', 'done'], 'pin-done', 'pin-todo'], ['case', ['get', 'approx'], '-a', '']];
   const PIN_PATH = 'M14 1.8C7.2 1.8 2 7 2 13.4 2 21.8 14 34.2 14 34.2S26 21.8 26 13.4C26 7 20.8 1.8 14 1.8z';
   function pinImage(id) {
@@ -616,7 +628,22 @@
     x.setLineDash([]); x.beginPath(); x.arc(14, 13.6, 4.6, 0, Math.PI * 2); x.fillStyle = '#fff'; x.fill();
     return x.getImageData(0, 0, c.width, c.height);
   }
-  function ensureImage(id) { if (id.indexOf('pin-') === 0 && !map.hasImage(id)) map.addImage(id, pinImage(id), { pixelRatio: 2 }); }
+  function clusterImage(n) {
+    const S = 2, sz = 38, c = document.createElement('canvas');
+    c.width = c.height = sz * S;
+    const x = c.getContext('2d'); x.scale(S, S);
+    const accent = (getComputedStyle(document.documentElement).getPropertyValue('--accent') || '#2f5bea').trim();
+    x.beginPath(); x.arc(sz / 2, sz / 2, sz / 2 - 2, 0, Math.PI * 2);
+    x.fillStyle = accent; x.fill(); x.lineWidth = 2.5; x.strokeStyle = '#fff'; x.stroke();
+    x.fillStyle = '#fff'; x.font = '700 15px -apple-system, "Segoe UI", Roboto, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText(String(n), sz / 2, sz / 2 + 1);
+    return x.getImageData(0, 0, c.width, c.height);
+  }
+  function ensureImage(id) {
+    if (map.hasImage(id)) return;
+    if (id.indexOf('pin-') === 0) map.addImage(id, pinImage(id), { pixelRatio: 2 });
+    else if (id.indexOf('cl-') === 0) map.addImage(id, clusterImage(id.slice(3)), { pixelRatio: 2 });
+  }
 
   const map = new maplibregl.Map({
     container: 'map', style: makeStyle(theme),
@@ -672,6 +699,18 @@
   map.on('dataloading', e => { if (!busyOn && e.dataType === 'source' && map.getZoom() >= EXTRUDE_FROM - 0.5) { busyOn = true; busy.classList.add('on'); } });
   map.on('idle', () => { if (busyOn) { busyOn = false; busy.classList.remove('on'); } setTimeout(runCapture, 150); });
 
+  /* ---- Control de altura de edificios ---- */
+  const hs = $('hscale'), hsOut = $('hscaleOut');
+  hs.addEventListener('input', () => { hsOut.textContent = '×' + (+hs.value).toFixed(1).replace('.', ','); });
+  hs.addEventListener('change', () => {          // se aplica al soltar: recalcular las alturas es costoso
+    hScale = +hs.value;
+    [['edificios-3d', H_EXPR, MINH_EXPR], ['hitos-3d', ['get', 'h'], ['get', 'b']], ['hitos-dyn-3d', ['get', 'h'], ['get', 'b']]].forEach(a => {
+      if (!map.getLayer(a[0])) return;
+      map.setPaintProperty(a[0], 'fill-extrusion-height', hx(a[1]));
+      map.setPaintProperty(a[0], 'fill-extrusion-base', hx(a[2]));
+    });
+  });
+
   /* ---- Panel de opciones ---- */
   if (window.innerWidth >= 700) hud.classList.remove('collapsed');
   $('toggleHud').addEventListener('click', () => {
@@ -709,7 +748,7 @@
       order: String(g('order') || ''), price: String(g('price') || ''), priceState: String(g('priceState') || ''),
       prio: String(g('prio') || ''), notes: String(g('notes') || ''), src: String(g('src') || ''),
       est: g('est'), date: String(g('date') || ''), spent: g('spent'),
-      rv: g('rv'), rt: g('rt'), ra: g('ra'), avg: g('avg'), again: String(g('again') || ''), insta: String(g('insta') || ''),
+      rv: g('rv'), rt: g('rt'), ra: g('ra'), avg: g('avg'), again: String(g('again') || ''), insta: String(g('insta') || ''), photo: String(g('photo') || ''),
       visited: /^s[ií]$/i.test(String(g('visited'))),
       lat: toNum(g('lat')), lon: toNum(g('lon')), located: false, approx: false, failed: false
     };
@@ -842,8 +881,10 @@
     syncT = setTimeout(() => { const src = map.getSource('vermuterias'); if (src) src.setData(geojson()); }, 80);
   }
   function setSel(p) { if (map.getLayer('pin-sel')) map.setFilter('pin-sel', selFilter(p ? p.idx : null)); }
-  map.on('mouseenter', 'pins', () => { map.getCanvas().style.cursor = 'pointer'; });
-  map.on('mouseleave', 'pins', () => { map.getCanvas().style.cursor = ''; });
+  ['pins', 'pin-clusters'].forEach(id => {
+    map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
+  });
 
   /* ================== FICHA ================== */
   const card = $('card'), listEl = $('list'), hitosEl = $('hitos');
@@ -880,8 +921,9 @@
     let host = '';
     try { host = src ? new URL(src).hostname.replace(/^www\./, '') : ''; } catch (e) { host = ''; }
 
+    const photo = safeUrl(p.photo) ? '<img class="photo" loading="lazy" referrerpolicy="no-referrer" alt="' + esc(p.name) + '" src="' + esc(safeUrl(p.photo)) + '">' : '';
     return '<div class="grab"></div><button class="close" type="button" data-close aria-label="Cerrar">✕</button>' +
-      '<h2>' + esc(p.name) + '</h2><p class="zone">' + esc(p.zone) + '</p>' +
+      '<h2>' + esc(p.name) + '</h2><p class="zone">' + esc(p.zone) + '</p>' + photo +
       '<div class="chips">' + prio + (p.visited ? '<span class="chip ok">Visitada ✓</span>' : '<span class="chip todo">Pendiente</span>') +
       (p.price ? '<span class="chip">' + esc(p.price) + '</span>' : '') + '</div>' +
       '<div class="actions"><a class="main" href="' + g + '" target="_blank" rel="noopener">Google Maps</a><a href="' + a + '" target="_blank" rel="noopener">Apple Maps</a></div>' +
@@ -896,6 +938,7 @@
   function select(p, fly) {
     sel = p; setSel(p);
     card.innerHTML = cardHtml(p);
+    const im = card.querySelector('img.photo'); if (im) im.addEventListener('error', () => im.remove());
     openSheet(card);
     if (fly && p.located) {
       map.flyTo({
@@ -964,13 +1007,21 @@
   $('btnList').addEventListener('click', () => { renderList(); openSheet(listEl); });
   document.querySelectorAll('#bar [data-f]').forEach(b => b.addEventListener('click', () => {
     filter = b.dataset.f;
-    if (map.getLayer('pins')) map.setFilter('pins', pinFilter());
+    syncPins();
     renderList();
   }));
   document.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeSheets(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
   map.on('click', e => {
     const r = 5;
+    const cf = map.getLayer('pin-clusters') ? map.queryRenderedFeatures([[e.point.x - 12, e.point.y - 12], [e.point.x + 12, e.point.y + 12]], { layers: ['pin-clusters'] }) : [];
+    if (cf.length) {
+      const f0 = cf[0], src = map.getSource('vermuterias');
+      Promise.resolve(src.getClusterExpansionZoom(f0.properties.cluster_id))
+        .then(z => map.easeTo({ center: f0.geometry.coordinates, zoom: Math.min((+z || 14) + 0.4, 17.5), duration: 700 }))
+        .catch(() => map.easeTo({ center: f0.geometry.coordinates, zoom: map.getZoom() + 2 }));
+      return;
+    }
     const f = map.getLayer('pins') ? map.queryRenderedFeatures([[e.point.x - r, e.point.y - r], [e.point.x + r, e.point.y + r]], { layers: ['pins'] }) : [];
     if (f.length) { const p = places[f[0].properties.idx]; if (p) select(p, true); return; }
     const hl = ['hitos-3d', 'hitos-dyn-3d'].filter(id => map.getLayer(id));
