@@ -234,63 +234,65 @@
 
   /* ====== HITOS DE MADRID: modelos 3D (editables) ======
      Cada hito: posición real (lon, lat) y una lista de piezas.
-     Medidas en metros. z0/z1 = altura inferior/superior de cada pieza. */
+     Medidas en metros. z0/z1 = altura inferior/superior de cada pieza.
+     band = franjas horizontales (pisos / cristal): h = alto de cada franja, c = color de la línea. */
   const KLON = 84860, KLAT = 111040;             // metros por grado en Madrid
   const HITOS = [
     { name: 'Torre de Cristal', at: [-3.687555, 40.47823], info: '249 m · 2008 · César Pelli', parts: [
-      { t: 'box', w: 46, d: 40, cham: 8, z0: 0, z1: 226, c: '#5b8fa0' },
-      { t: 'box', w: 38, d: 33, cham: 6, z0: 226, z1: 238, c: '#78a9b8' },
-      { t: 'box', w: 28, d: 26, cham: 5, z0: 238, z1: 249, c: '#a6cbd6' } ] },
+      { t: 'box', w: 46, d: 40, cham: 8, z0: 0, z1: 226, c: '#2d6e86', band: { h: 7.2, c: '#a9d6e2' } },
+      { t: 'box', w: 38, d: 33, cham: 6, z0: 226, z1: 238, c: '#3f84a0', band: { h: 6, c: '#bfe3ec' } },
+      { t: 'box', w: 28, d: 26, cham: 5, z0: 238, z1: 249, c: '#c8e8f0' } ] },
     { name: 'Torre Moeve (Cepsa)', at: [-3.687758, 40.475731], info: '248 m · 2008 · Norman Foster', parts: [
-      { t: 'loft', w: 56, d: 38, cham: 8, z0: 0, z1: 248.3, k0: 1, k1: 0.68, n: 20, c: '#7f95a9', c1: '#b0c3d1' } ] },
+      { t: 'loft', w: 56, d: 38, cham: 8, z0: 0, z1: 242, k0: 1, k1: 0.68, n: 30, c: '#8d9fb0', c1: '#dbe4ec' },
+      { t: 'loft', w: 38, d: 26, cham: 6, z0: 242, z1: 248.3, k0: 1, k1: 0.9, n: 2, c: '#f0f4f7' } ] },
     { name: 'Torre PwC', at: [-3.687919, 40.476669], info: '236 m · 2008', parts: [
-      { t: 'box', w: 50, d: 34, cham: 6, z0: 0, z1: 200, c: '#a7c1d1' },
-      { t: 'box', w: 40, d: 28, cham: 5, z0: 200, z1: 236, c: '#d2e1e9' } ] },
+      { t: 'box', w: 50, d: 34, cham: 6, z0: 0, z1: 200, c: '#4f8db8', band: { h: 9, c: '#f6f9fb' } },
+      { t: 'box', w: 40, d: 28, cham: 5, z0: 200, z1: 236, c: '#7cb0d4', band: { h: 9, c: '#ffffff' } } ] },
     { name: 'Torre Emperador', at: [-3.686787, 40.47908], info: '224 m · 2008 · Pei Cobb Freed', parts: [
-      { t: 'box', w: 46, d: 40, cham: 4, z0: 0, z1: 150, c: '#7396ac' },
-      { t: 'box', w: 38, d: 34, cham: 4, z0: 150, z1: 195, c: '#8bafc3' },
-      { t: 'box', w: 28, d: 28, cham: 3, z0: 195, z1: 224.2, c: '#a9c7d7' } ] },
+      { t: 'box', w: 46, d: 40, cham: 4, z0: 0, z1: 150, c: '#23778c', band: { h: 6, c: '#cfeaf0' } },
+      { t: 'box', w: 38, d: 34, cham: 4, z0: 150, z1: 195, c: '#3a90a5', band: { h: 6, c: '#dff2f6' } },
+      { t: 'box', w: 28, d: 28, cham: 3, z0: 195, z1: 224.2, c: '#9fd0dc' } ] },
     { name: 'Caleido', at: [-3.689158, 40.477798], info: '173 m · 2021', parts: [
-      { t: 'box', w: 70, d: 55, z0: 0, z1: 28, c: '#9ea19c' },
-      { t: 'box', w: 36, d: 46, dx: -6, z0: 28, z1: 173.2, c: '#b9bbb6' } ] },
+      { t: 'box', w: 70, d: 55, z0: 0, z1: 28, c: '#8c938e', band: { h: 7, c: '#c3c8c4' } },
+      { t: 'box', w: 36, d: 46, dx: -6, z0: 28, z1: 173.2, c: '#dcddd6', band: { h: 4.5, c: '#86adc0' } } ] },
     { name: 'Torre Picasso', at: [-3.693016, 40.45031], info: '156 m · 1989 · Minoru Yamasaki', parts: [
-      { t: 'box', w: 45, d: 45, cham: 7, z0: 0, z1: 150, c: '#cfd6db' },
-      { t: 'box', w: 45, d: 45, cham: 7, z0: 150, z1: 156.4, c: '#a9b3bb' } ] },
+      { t: 'box', w: 45, d: 45, cham: 7, z0: 0, z1: 150, c: '#e4e7e9', band: { h: 4, c: '#77818b' } },
+      { t: 'box', w: 45, d: 45, cham: 7, z0: 150, z1: 156.4, c: '#8b95a0' } ] },
     { name: 'Torre Europa', at: [-3.691605, 40.451485], info: '116 m · 1985', parts: [
-      { t: 'box', w: 52, d: 26, cham: 5, z0: 0, z1: 110, c: '#c4ccd2' },
-      { t: 'box', w: 44, d: 22, cham: 4, z0: 110, z1: 116.1, c: '#e2e7ea' } ] },
+      { t: 'box', w: 52, d: 26, cham: 5, z0: 0, z1: 110, c: '#d9dde1', band: { h: 3.9, c: '#6c7884' } },
+      { t: 'box', w: 44, d: 22, cham: 4, z0: 110, z1: 116.1, c: '#eef1f3' } ] },
     { name: 'Torre de Madrid', at: [-3.712199, 40.424397], info: '142 m · 1957 · hermanos Otamendi', parts: [
-      { t: 'box', w: 44, d: 40, z0: 0, z1: 60, c: '#d6c9ad' },
-      { t: 'box', w: 38, d: 34, z0: 60, z1: 100, c: '#d9cdb2' },
-      { t: 'box', w: 30, d: 28, z0: 100, z1: 124, c: '#dcd0b6' },
-      { t: 'box', w: 20, d: 18, z0: 124, z1: 142, c: '#8b6b4d' } ] },
+      { t: 'box', w: 44, d: 40, z0: 0, z1: 60, c: '#e3d6b6', band: { h: 3.2, c: '#b49a72' } },
+      { t: 'box', w: 38, d: 34, z0: 60, z1: 100, c: '#e6dab9', band: { h: 3.2, c: '#b49a72' } },
+      { t: 'box', w: 30, d: 28, z0: 100, z1: 124, c: '#e9ddbe', band: { h: 3.2, c: '#b49a72' } },
+      { t: 'box', w: 20, d: 18, z0: 124, z1: 142, c: '#7a573a' } ] },
     { name: 'Torres de Colón', at: [-3.691106, 40.425632], info: '115 m · 1976 · Antonio Lamela', parts: [
-      { t: 'box', w: 36, d: 24, dy: 22, z0: 0, z1: 100.6, c: '#8c7762' },
-      { t: 'box', w: 38, d: 26, dy: 22, z0: 100.6, z1: 115.1, c: '#ece7dc' },
-      { t: 'box', w: 36, d: 24, dy: -22, z0: 0, z1: 100.6, c: '#8c7762' },
-      { t: 'box', w: 38, d: 26, dy: -22, z0: 100.6, z1: 115.1, c: '#ece7dc' } ] },
+      { t: 'box', w: 36, d: 24, dy: 22, z0: 0, z1: 100.6, c: '#6a483a', band: { h: 3.8, c: '#a67d66' } },
+      { t: 'box', w: 38, d: 26, dy: 22, z0: 100.6, z1: 115.1, c: '#f3efe6' },
+      { t: 'box', w: 36, d: 24, dy: -22, z0: 0, z1: 100.6, c: '#6a483a', band: { h: 3.8, c: '#a67d66' } },
+      { t: 'box', w: 38, d: 26, dy: -22, z0: 100.6, z1: 115.1, c: '#f3efe6' } ] },
     { name: 'Puerta de Europa I (Torre KIO)', at: [-3.690103, 40.466995], lean: { deg: 15, to: [-3.688112, 40.46669] }, info: '114 m · 1996 · inclinada 15°', parts: [
-      { t: 'loft', w: 34, d: 30, z0: 0, z1: 108, k0: 1, k1: 1, n: 40, c: '#4f5a66', c1: '#7a8693' },
-      { t: 'loft', w: 34, d: 30, z0: 108, z1: 113.8, k0: 1, k1: 1, n: 3, c: '#9aa5b0' } ] },
+      { t: 'loft', w: 34, d: 30, z0: 0, z1: 108, k0: 1, k1: 1, n: 40, c: '#3b4653', c1: '#8794a3' },
+      { t: 'loft', w: 34, d: 30, z0: 108, z1: 113.8, k0: 1, k1: 1, n: 3, c: '#c4ced8' } ] },
     { name: 'Puerta de Europa II (Torre KIO)', at: [-3.688112, 40.46669], lean: { deg: 15, to: [-3.690103, 40.466995] }, info: '114 m · 1996 · inclinada 15°', parts: [
-      { t: 'loft', w: 34, d: 30, z0: 0, z1: 108, k0: 1, k1: 1, n: 40, c: '#4f5a66', c1: '#7a8693' },
-      { t: 'loft', w: 34, d: 30, z0: 108, z1: 113.8, k0: 1, k1: 1, n: 3, c: '#9aa5b0' } ] },
+      { t: 'loft', w: 34, d: 30, z0: 0, z1: 108, k0: 1, k1: 1, n: 40, c: '#3b4653', c1: '#8794a3' },
+      { t: 'loft', w: 34, d: 30, z0: 108, z1: 113.8, k0: 1, k1: 1, n: 3, c: '#c4ced8' } ] },
     { name: 'Edificio España', at: [-3.711002, 40.424061], info: '107 m · 1953 · hermanos Otamendi', parts: [
-      { t: 'box', w: 64, d: 48, z0: 0, z1: 46, c: '#cdb08a' },
-      { t: 'box', w: 44, d: 34, z0: 46, z1: 92, c: '#d0b48f' },
-      { t: 'box', w: 30, d: 24, z0: 92, z1: 107, c: '#8e7257' },
-      { t: 'loft', w: 14, d: 12, z0: 107, z1: 117, k0: 1, k1: 0.1, n: 6, c: '#5f5145' } ] },
+      { t: 'box', w: 64, d: 48, z0: 0, z1: 46, c: '#dcc39c', band: { h: 3.4, c: '#b5956a' } },
+      { t: 'box', w: 44, d: 34, z0: 46, z1: 92, c: '#dfc7a2', band: { h: 3.4, c: '#b5956a' } },
+      { t: 'box', w: 30, d: 24, z0: 92, z1: 107, c: '#7a5c46' },
+      { t: 'loft', w: 14, d: 12, z0: 107, z1: 117, k0: 1, k1: 0.1, n: 6, c: '#4d4137' } ] },
     { name: 'Castellana 81', at: [-3.691986, 40.447609], info: '107 m · 1981 · Sáenz de Oiza', parts: [
-      { t: 'box', w: 40, d: 34, cham: 7, z0: 0, z1: 98, c: '#b78a3c' },
-      { t: 'box', w: 30, d: 26, cham: 5, z0: 98, z1: 107, c: '#9c7430' } ] },
+      { t: 'box', w: 40, d: 34, cham: 7, z0: 0, z1: 98, c: '#9a6c20', band: { h: 3.9, c: '#d9ab58' } },
+      { t: 'box', w: 30, d: 26, cham: 5, z0: 98, z1: 107, c: '#c99a45' } ] },
     { name: 'Torre Titania', at: [-3.6945, 40.446812], info: '104 m · 2011', parts: [
-      { t: 'box', w: 38, d: 30, cham: 5, z0: 0, z1: 96, c: '#98b4c4' },
-      { t: 'box', w: 28, d: 22, cham: 4, z0: 96, z1: 103.7, c: '#bcd0dc' } ] },
+      { t: 'box', w: 38, d: 30, cham: 5, z0: 0, z1: 96, c: '#5f89a5', band: { h: 4.2, c: '#d3e4ee' } },
+      { t: 'box', w: 28, d: 22, cham: 4, z0: 96, z1: 103.7, c: '#cfe0ea' } ] },
     { name: 'Torrespaña', at: [-3.664186, 40.420522], info: '232 m · 1982', parts: [
       { t: 'box', w: 24, d: 24, z0: 0, z1: 20, c: '#a39d92' },
       { t: 'box', w: 13, d: 13, z0: 20, z1: 118, c: '#b6b0a4' },
       { t: 'loft', w: 30, d: 30, z0: 118, z1: 134, k0: 0.45, k1: 1, n: 4, c: '#8f897e' },
-      { t: 'box', w: 30, d: 30, z0: 134, z1: 150, c: '#9b958a' },
+      { t: 'box', w: 30, d: 30, z0: 134, z1: 150, c: '#9b958a', band: { h: 4, c: '#6f6a61' } },
       { t: 'loft', w: 30, d: 30, z0: 150, z1: 166, k0: 1, k1: 0.3, n: 4, c: '#8f897e' },
       { t: 'box', w: 4, d: 4, z0: 166, z1: 184, c: '#d0392e' }, { t: 'box', w: 3.4, d: 3.4, z0: 184, z1: 200, c: '#f4f4f4' },
       { t: 'box', w: 3, d: 3, z0: 200, z1: 216, c: '#d0392e' }, { t: 'box', w: 2.4, d: 2.4, z0: 216, z1: 232, c: '#f4f4f4' } ] },
@@ -347,7 +349,15 @@
       };
       H.parts.forEach(P => {
         const dx = P.dx || 0, dy = P.dy || 0;
-        if (P.t === 'box') add(rectPoly(P.w, P.d, P.cham), dx, dy, P.z0, P.z1, P.c);
+        if (P.t === 'box') {
+          const poly = rectPoly(P.w, P.d, P.cham);
+          if (!P.band) add(poly, dx, dy, P.z0, P.z1, P.c);
+          else for (let z = P.z0; z < P.z1 - 0.01; z += P.band.h) {      // franjas horizontales: simulan pisos y cristal
+            const zm = Math.min(z + P.band.h * 0.78, P.z1), ze = Math.min(z + P.band.h, P.z1);
+            add(poly, dx, dy, z, zm, P.c);
+            if (ze > zm + 0.01) add(poly, dx, dy, zm, ze, P.band.c);
+          }
+        }
         else if (P.t === 'cyl') add(circlePoly(P.r, P.n || 22), dx, dy, P.z0, P.z1, P.c);
         else if (P.t === 'loft') {
           const n = P.n || 8, base = rectPoly(P.w, P.d, P.cham);
@@ -366,6 +376,155 @@
   }
 
   const HITOS_GEO = buildHitos();
+
+  /* ====== HITOS SOBRE LA SILUETA REAL ======
+     Palacio Real, Cibeles, Almudena, Bernabéu…: el mapa base ya dibuja su volumen. Cuando las teselas están cargadas,
+     leemos esa silueta y altura reales, y dibujamos encima una copia con los colores del edificio (muros y tejado)
+     más sus elementos singulares (cúpula, torre…). Si el edificio todavía no se ha cargado, se reintenta solo. */
+  const grid3 = s => { const o = []; [-1, 0, 1].forEach(a => [-1, 0, 1].forEach(b => o.push([a * s, b * s]))); return o; };
+  const DYN = [
+    { name: 'Palacio Real', at: [-3.71433, 40.41796], probes: grid3(55), r: 170, h: 33, wall: '#ebe3cf', roof: '#7f8993', roofT: 3.5, zoom: 17, info: 'Siglo XVIII · residencia oficial de la Corona' },
+    { name: 'Catedral de la Almudena', at: [-3.71440, 40.41585], probes: grid3(45), r: 150, h: 34, base: 34, wall: '#ddd3b9', roof: '#7e868f', roofT: 4, extra: 'almudena', zoom: 17, info: 'Consagrada en 1993 · cúpula neoclásica' },
+    { name: 'Palacio de Cibeles', at: [-3.69196, 40.41883], probes: grid3(45), r: 150, h: 42, base: 44, wall: '#f1ece2', roof: '#4f565e', roofT: 6, extra: 'cibeles', ref: [-3.69309, 40.41934], zoom: 17, info: '1919 · Antonio Palacios y Joaquín Otamendi' },
+    { name: 'Banco de España', at: [-3.69492, 40.41791], probes: grid3(40), r: 150, h: 30, wall: '#e7dcc1', roof: '#6d747c', roofT: 4, zoom: 17, info: '1891 · Eduardo Adaro' },
+    { name: 'Edificio Metrópolis', at: [-3.69805, 40.41905], probes: grid3(22), r: 100, h: 40, base: 38, wall: '#f0ebe0', roof: '#59626d', roofT: 5, extra: 'metropolis', ref: [-3.69762, 40.41932], zoom: 18, info: '1911 · Jules y Raymond Février' },
+    { name: 'Edificio Telefónica', at: [-3.701907, 40.420338], probes: grid3(25), r: 120, h: 80, wall: '#cdbb9a', roof: '#5b5147', roofT: 6, zoom: 17.4, info: '88 m · 1929 · primer rascacielos de Madrid' },
+    { name: 'Estadio Santiago Bernabéu', at: [-3.68835, 40.45306], probes: grid3(75), r: 260, h: 48, wall: '#d6dbe0', roof: '#2f353c', roofT: 9, zoom: 16.6, info: 'Estadio del Real Madrid · inaugurado en 1947' }
+  ];
+  const ALL = HITOS.concat(DYN);
+  let dynFeats = [];
+  const dynGeo = () => ({ type: 'FeatureCollection', features: [].concat.apply([], dynFeats.filter(Boolean)) });
+
+  /* geometría sobre lon/lat */
+  const ringArea = r => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += r[j][0] * r[i][1] - r[i][0] * r[j][1]; return a / 2; };
+  function inRing(p, r) {
+    let c = false;
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const xi = r[i][0], yi = r[i][1], xj = r[j][0], yj = r[j][1];
+      if (((yi > p[1]) !== (yj > p[1])) && (p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi)) c = !c;
+    }
+    return c;
+  }
+  function inPoly(p, poly) { if (!inRing(p, poly[0])) return false; for (let i = 1; i < poly.length; i++) if (inRing(p, poly[i])) return false; return true; }
+  const polysOf = g => !g ? [] : g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+  const keyOf = poly => poly[0].length + ':' + poly[0][0][0].toFixed(6) + ':' + poly[0][0][1].toFixed(6) + ':' + Math.abs(ringArea(poly[0])).toExponential(3);
+  function centroid(poly) {
+    const r = poly[0]; let a = 0, cx = 0, cy = 0;
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const f = r[j][0] * r[i][1] - r[i][0] * r[j][1]; a += f; cx += (r[j][0] + r[i][0]) * f; cy += (r[j][1] + r[i][1]) * f; }
+    if (Math.abs(a) < 1e-18) { let sx = 0, sy = 0; r.forEach(p => { sx += p[0]; sy += p[1]; }); return [sx / r.length, sy / r.length]; }
+    return [cx / (3 * a), cy / (3 * a)];
+  }
+  function scaleAbout(poly, c, k) { return [poly[0].map(p => [c[0] + (p[0] - c[0]) * k, c[1] + (p[1] - c[1]) * k])].concat(poly.slice(1)); }
+  // punto del contorno más cercano a ref, con la dirección (rumbo en grados) de ese lado
+  function nearestEdge(poly, ref) {
+    const r = poly[0]; let best = null;
+    for (let i = 0; i < r.length - 1; i++) {
+      const ax = (r[i][0] - ref[0]) * KLON, ay = (r[i][1] - ref[1]) * KLAT, bx = (r[i + 1][0] - ref[0]) * KLON, by = (r[i + 1][1] - ref[1]) * KLAT;
+      const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2));
+      const px = ax + dx * t, py = ay + dy * t, d = Math.hypot(px, py);
+      if (!best || d < best.d) best = { d: d, pt: [ref[0] + px / KLON, ref[1] + py / KLAT], bearing: Math.atan2(dx, dy) * 180 / Math.PI };
+    }
+    return best;
+  }
+  function nearestVertex(poly, ref) {
+    let best = null;
+    poly[0].forEach(p => { const d = Math.hypot((p[0] - ref[0]) * KLON, (p[1] - ref[1]) * KLAT); if (!best || d < best.d) best = { d: d, pt: p }; });
+    return best;
+  }
+  const toward = (from, to, m) => { const dx = (to[0] - from[0]) * KLON, dy = (to[1] - from[1]) * KLAT, L = Math.hypot(dx, dy) || 1; return [from[0] + dx / L * m / KLON, from[1] + dy / L * m / KLAT]; };
+  function ringAt(pts, lon, lat, rotDeg) {
+    const a = rad(rotDeg || 0), ca = Math.cos(a), sa = Math.sin(a);
+    const r = pts.map(p => [lon + (p[0] * ca + p[1] * sa) / KLON, lat + (-p[0] * sa + p[1] * ca) / KLAT]);
+    r.push(r[0]); return r;
+  }
+  const dynFeat = (k, ring, z0, z1, c) => ({ type: 'Feature', properties: { k: k, b: Math.round(z0 * 100) / 100, h: Math.round(z1 * 100) / 100, c: c },
+    geometry: { type: 'Polygon', coordinates: Array.isArray(ring[0][0]) ? ring : [ring] } });
+  function domeAt(out, k, c, R, z0, hh, col, n) {
+    for (let i = 0; i < n; i++) {
+      const t0 = i / n, t1 = (i + 1) / n, tm = (t0 + t1) / 2, r = Math.max(R * Math.sqrt(1 - tm * tm), R * 0.08);
+      out.push(dynFeat(k, ringAt(circlePoly(r, 20), c[0], c[1], 0), z0 + hh * t0, z0 + hh * t1 + (i < n - 1 ? 0.05 : 0), col));
+    }
+  }
+  const EXTRAS = {
+    almudena(L, k, big, h, out) {
+      const c = centroid(big.poly), base = Math.min(h, L.base || h);
+      out.push(dynFeat(k, ringAt(circlePoly(9.5, 24), c[0], c[1], 0), base, base + 12, L.wall));
+      domeAt(out, k, c, 9.5, base + 12, 14, '#8a929b', 9);
+      out.push(dynFeat(k, ringAt(circlePoly(1.8, 12), c[0], c[1], 0), base + 26, base + 33, '#dcd3b8'));
+    },
+    cibeles(L, k, big, h, out) {
+      const e = nearestEdge(big.poly, L.ref), base = Math.min(h, L.base || h);
+      const ctr = toward(e.pt, centroid(big.poly), 15);
+      out.push(dynFeat(k, ringAt(rectPoly(12, 12), ctr[0], ctr[1], e.bearing), base, base + 22, L.wall));
+      for (let i = 0; i < 5; i++) {
+        const f0 = i / 5, f1 = (i + 1) / 5, s = 1.1 - 0.95 * (f0 + f1) / 2;
+        out.push(dynFeat(k, ringAt(rectPoly(12 * s, 12 * s), ctr[0], ctr[1], e.bearing), base + 22 + 12 * f0, base + 22 + 12 * f1, '#4f565e'));
+      }
+      out.push(dynFeat(k, ringAt(circlePoly(0.7, 8), ctr[0], ctr[1], 0), base + 34, base + 44, '#4f565e'));
+    },
+    metropolis(L, k, big, h, out) {
+      const v = nearestVertex(big.poly, L.ref), c = toward(v.pt, centroid(big.poly), 5), base = Math.min(h, L.base || h);
+      out.push(dynFeat(k, ringAt(circlePoly(5.2, 20), c[0], c[1], 0), base, base + 4, '#f0ebe0'));
+      domeAt(out, k, c, 5.2, base + 4, 6.5, '#47505b', 6);
+      out.push(dynFeat(k, ringAt(circlePoly(0.9, 8), c[0], c[1], 0), base + 10.5, base + 15.5, '#d4a72c'));   // el Ave Fénix
+    }
+  };
+
+  function captureOne(L, idx) {
+    const q = f => { try { return map.querySourceFeatures('ofm', { sourceLayer: 'building', filter: f }); } catch (e) { return []; } };
+    let feats = q(['<', ['distance', { type: 'Point', coordinates: L.at }], L.r || 150]);
+    if (!feats.length) feats = q(['>', ['coalesce', ['get', 'render_height'], 0], 10]);
+    const cand = new Map();
+    L.probes.forEach(o => {
+      const pt = [L.at[0] + o[0] / KLON, L.at[1] + o[1] / KLAT];
+      let best = null;
+      feats.forEach(f => {
+        if (f.properties && f.properties.hide_3d) return;
+        polysOf(f.geometry).forEach(poly => {
+          if (!inPoly(pt, poly)) return;
+          const a = Math.abs(ringArea(poly[0]));
+          if (!best || a < best.a) best = { poly: poly, a: a, h: +f.properties.render_height || 0, m: +f.properties.render_min_height || 0 };
+        });
+      });
+      if (best) cand.set(keyOf(best.poly), best);
+    });
+    if (!cand.size) return [];
+    const k = HITOS.length + idx, out = [];
+    let big = null, hBig = L.h;
+    cand.forEach(c => {
+      const h = c.h > 2 ? c.h : L.h, p = scaleAbout(c.poly, centroid(c.poly), 1.004);
+      if (!big || c.a > big.a) { big = c; hBig = h; }
+      if (L.roofT && h - c.m > L.roofT * 2) {
+        out.push(dynFeat(k, p, c.m, h - L.roofT, L.wall));
+        out.push(dynFeat(k, p, h - L.roofT, h + 0.3, L.roof));
+      } else out.push(dynFeat(k, p, c.m, h + 0.3, L.wall));
+    });
+    if (L.extra && EXTRAS[L.extra] && big) EXTRAS[L.extra](L, k, big, hBig, out);
+    return out;
+  }
+
+  const dynState = DYN.map(() => ({ done: false, tries: 0 }));
+  let dynBusy = false;
+  function runCapture() {
+    if (dynBusy || map.getZoom() < 14.9) return;
+    dynBusy = true;
+    try {
+      const c = map.getCenter();
+      let changed = false;
+      DYN.forEach((L, i) => {
+        const st = dynState[i];
+        if (st.done || st.tries >= 8) return;
+        if (Math.hypot((c.lng - L.at[0]) * KLON, (c.lat - L.at[1]) * KLAT) > 1100) return;
+        st.tries++;
+        const f = captureOne(L, i);
+        if (f.length) { st.done = true; dynFeats[i] = f; changed = true; }
+      });
+      if (changed) { const src = map.getSource('hitosdyn'); if (src) src.setData(dynGeo()); }
+    } catch (e) { /* se reintenta en la siguiente pausa del mapa */ }
+    dynBusy = false;
+  }
+
   const HIDE_OSM_FROM = 101;   // los edificios de más de 100 m del mapa base se ocultan: los dibujamos nosotros
 
   /* ================== ESTILO DEL MAPA (mínimo, rápido) ================== */
@@ -384,7 +543,7 @@
     const S = 'ofm';
     return {
       version: 8, name: 'madrid-3d',
-      sources: { ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' }, vermuterias: { type: 'geojson', data: geojson() }, hitos: { type: 'geojson', data: HITOS_GEO } },
+      sources: { ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' }, vermuterias: { type: 'geojson', data: geojson() }, hitos: { type: 'geojson', data: HITOS_GEO }, hitosdyn: { type: 'geojson', data: dynGeo() } },
       light: { anchor: 'viewport', position: [1.4, 215, 35], color: dk ? '#9fb0d8' : '#ffffff', intensity: dk ? 0.35 : 0.42 },
       layers: [
         { id: 'fondo', type: 'background', paint: { 'background-color': C.bg } },
@@ -410,6 +569,13 @@
             'fill-extrusion-opacity': 1, 'fill-extrusion-vertical-gradient': false
           } },
         { id: 'hitos-3d', type: 'fill-extrusion', source: 'hitos', minzoom: EXTRUDE_FROM,
+          paint: {
+            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], EXTRUDE_FROM, 0, EXTRUDE_FULL, ['get', 'h']],
+            'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], EXTRUDE_FROM, 0, EXTRUDE_FULL, ['get', 'b']],
+            'fill-extrusion-color': ['get', 'c'],
+            'fill-extrusion-opacity': 1, 'fill-extrusion-vertical-gradient': true
+          } },
+        { id: 'hitos-dyn-3d', type: 'fill-extrusion', source: 'hitosdyn', minzoom: EXTRUDE_FROM,
           paint: {
             'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], EXTRUDE_FROM, 0, EXTRUDE_FULL, ['get', 'h']],
             'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], EXTRUDE_FROM, 0, EXTRUDE_FULL, ['get', 'b']],
@@ -504,7 +670,7 @@
   const busy = $('busy');
   let busyOn = false;
   map.on('dataloading', e => { if (!busyOn && e.dataType === 'source' && map.getZoom() >= EXTRUDE_FROM - 0.5) { busyOn = true; busy.classList.add('on'); } });
-  map.on('idle', () => { if (busyOn) { busyOn = false; busy.classList.remove('on'); } });
+  map.on('idle', () => { if (busyOn) { busyOn = false; busy.classList.remove('on'); } setTimeout(runCapture, 150); });
 
   /* ---- Panel de opciones ---- */
   if (window.innerWidth >= 700) hud.classList.remove('collapsed');
@@ -747,10 +913,10 @@
       '<h2>' + esc(H.name) + '</h2><p class="zone">' + esc(H.info) + '</p>' +
       '<div class="actions"><a class="main" href="https://www.google.com/maps/search/?api=1&query=' + q + '" target="_blank" rel="noopener">Google Maps</a>' +
       '<a href="https://maps.apple.com/?q=' + q + '&ll=' + H.at[1] + ',' + H.at[0] + '" target="_blank" rel="noopener">Apple Maps</a></div>' +
-      '<p class="note">Modelo 3D aproximado: la posición y la altura son reales; las formas y los colores están simplificados.</p>';
+      '<p class="note">' + (H.parts ? 'Modelo 3D aproximado: la posición y la altura son reales; las formas y los colores están simplificados.' : 'Silueta y altura del mapa; colores y elementos singulares añadidos de forma aproximada.') + '</p>';
   }
   function selectHito(k, fly) {
-    const H = HITOS[k]; if (!H) return;
+    const H = ALL[k]; if (!H) return;
     if (sel) { sel = null; setSel(null); }
     card.innerHTML = hitoHtml(H);
     openSheet(card);
@@ -762,15 +928,17 @@
       });
     }
   }
-  $('hitoItems').innerHTML = HITOS.map((H, k) =>
-    '<button type="button" class="item" data-k="' + k + '"><span class="dot" style="background:' + esc(H.parts[0].c) + '"></span>' +
+  $('hitoItems').innerHTML = ALL.map((H, k) =>
+    '<button type="button" class="item" data-k="' + k + '"><span class="dot" style="background:' + esc(H.wall || H.parts[0].c) + '"></span>' +
     '<span class="t"><b>' + esc(H.name) + '</b><span>' + esc(H.info) + '</span></span></button>').join('');
   $('hitoItems').addEventListener('click', e => {
     const b = e.target.closest('.item'); if (b) selectHito(+b.dataset.k, true);
   });
   $('btnHitos').addEventListener('click', () => openSheet(hitosEl));
-  map.on('mouseenter', 'hitos-3d', () => { map.getCanvas().style.cursor = 'pointer'; });
-  map.on('mouseleave', 'hitos-3d', () => { map.getCanvas().style.cursor = ''; });
+  ['hitos-3d', 'hitos-dyn-3d'].forEach(id => {
+    map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
+  });
 
   /* ================== LISTA Y FILTROS ================== */
   function renderList() {
@@ -805,7 +973,8 @@
     const r = 5;
     const f = map.getLayer('pins') ? map.queryRenderedFeatures([[e.point.x - r, e.point.y - r], [e.point.x + r, e.point.y + r]], { layers: ['pins'] }) : [];
     if (f.length) { const p = places[f[0].properties.idx]; if (p) select(p, true); return; }
-    const hf = map.getLayer('hitos-3d') ? map.queryRenderedFeatures(e.point, { layers: ['hitos-3d'] }) : [];
+    const hl = ['hitos-3d', 'hitos-dyn-3d'].filter(id => map.getLayer(id));
+    const hf = hl.length ? map.queryRenderedFeatures(e.point, { layers: hl }) : [];
     if (hf.length) selectHito(hf[0].properties.k, false);
     else if (card.classList.contains('open') || hitosEl.classList.contains('open')) closeSheets();
   });
