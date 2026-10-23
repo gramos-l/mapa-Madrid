@@ -182,6 +182,11 @@
     if (Math.abs(a) < 1e-18) { let sx = 0, sy = 0; r.forEach(p => { sx += p[0]; sy += p[1]; }); return [sx / r.length, sy / r.length]; }
     return [cx / (3 * a), cy / (3 * a)];
   }
+  // agranda la silueta unos metros hacia fuera: así la copia coloreada envuelve al edificio del mapa base y no queda oculta dentro
+  function inflate(poly, meters) {
+    const c = centroid(poly), aM = Math.abs(ringArea(poly[0])) * KLON * KLAT, r = Math.max(8, Math.sqrt(aM / Math.PI));
+    return scaleAbout(poly, c, 1 + meters / r);
+  }
   function scaleAbout(poly, c, k) { return [poly[0].map(p => [c[0] + (p[0] - c[0]) * k, c[1] + (p[1] - c[1]) * k])].concat(poly.slice(1)); }
   // punto del contorno más cercano a ref, con la dirección (rumbo en grados) de ese lado
   function nearestEdge(poly, ref) {
@@ -259,25 +264,23 @@
     const cand = new Map();
     L.probes.forEach(o => {
       const pt = [L.at[0] + o[0] / KLON, L.at[1] + o[1] / KLAT];
-      let best = null;
       feats.forEach(f => {
         if (f.properties && f.properties.hide_3d) return;
         polysOf(f.geometry).forEach(poly => {
           if (!inPoly(pt, poly)) return;
-          const a = Math.abs(ringArea(poly[0]));
-          if (!best || a < best.a) best = { poly: poly, a: a, h: +f.properties.render_height || 0, m: +f.properties.render_min_height || 0 };
+          const key = keyOf(poly);
+          if (!cand.has(key)) cand.set(key, { poly: poly, a: Math.abs(ringArea(poly[0])), h: +f.properties.render_height || 0, m: +f.properties.render_min_height || 0 });
         });
       });
-      if (best) cand.set(keyOf(best.poly), best);
     });
     if (!cand.size) return [];
     const out = [];
     let big = null, hBig = L.h, hMax = 0;
     cand.forEach(c => { hMax = Math.max(hMax, c.h > 2 ? c.h : L.h); });
     cand.forEach(c => {
-      const h = c.h > 2 ? c.h : L.h, p = scaleAbout(c.poly, centroid(c.poly), 1.004);
+      const h = c.h > 2 ? c.h : L.h, p = inflate(c.poly, 1.4);
       if (!big || c.a > big.a) { big = c; hBig = h; }
-      const isLow = L.band && h < hMax * 0.45;            // podio o cuerpos bajos de una torre
+      const isLow = L.band && h < hMax * 0.3;             // podio o cuerpos bajos de una torre
       if (isLow) out.push(dynFeat(k, p, c.m, h + 0.3, L.low || L.wall));
       else if (L.band) {
         const top = L.roof ? Math.min(3, (h - c.m) * 0.05) : 0;
