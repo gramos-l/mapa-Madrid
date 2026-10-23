@@ -1,6 +1,8 @@
 /* Caché del mapa de Madrid: las teselas y la librería se guardan en el móvil
-   para que las siguientes visitas carguen casi al instante. */
-const SHELL = 'madrid3d-shell-v1';
+   para que las siguientes visitas carguen casi al instante.
+   El Excel (.xlsx) y los datos (.json) se piden siempre primero a internet,
+   para que tus cambios se vean en cuanto los subes. */
+const SHELL = 'madrid3d-shell-v2';
 const TILES = 'madrid3d-tiles-v1';
 const MAX_TILES = 1500;
 
@@ -76,6 +78,8 @@ self.addEventListener('fetch', e => {
     } else {
       e.respondWith(networkFirst(req, TILES, 2500));
     }
+  } else if (url.origin === self.location.origin && /\.(xlsx|json)$/i.test(url.pathname)) {
+    e.respondWith(networkFirst(req, SHELL, 4000));
   } else if (url.hostname === 'cdnjs.cloudflare.com' || url.origin === self.location.origin) {
     e.respondWith(staleWhileRevalidate(req, SHELL));
   }
