@@ -4,60 +4,52 @@ Documento de trabajo de Vermut Tour Madrid. Distingue lo **verificado** (con fue
 
 ## 1. Estado del proyecto
 
-- Archivos: `index.html` (estructura), `styles.css` (diseño y colores), `hitos.js` (modelos y siluetas de hitos), `app.js` (mapa, chinchetas, fichas, lista, Excel), `sw.js` (caché), `vermuterias.json` (copia de datos). Sin compilador ni dependencias instaladas: GitHub Pages sirve los archivos tal cual.
-- Motor cartográfico: **MapLibre GL JS 4.7.1** (cdnjs). Teselas vectoriales de **OpenFreeMap** (esquema OpenMapTiles, datos de OpenStreetMap).
-- Edificios: extrusión de los polígonos de OpenStreetMap con su altura. **No son fotogramétricos**: no hay texturas ni fachadas reales.
-- Chinchetas: capa del propio mapa (GPU) con agrupación; imágenes generadas con canvas.
-- Excel: SheetJS se descarga solo si existe `Vermut_Tour_Madrid.xlsx` o se usa «Cargar mi Excel»; si no, se lee `vermuterias.json`.
+- Archivos: `index.html` (estructura), `styles.css` (diseño y colores), `hitos.js` (hitos), `app.js` (mapa, chinchetas, fichas, lista, Excel), `diagnostico.js` (panel de diagnóstico), `fotorrealista.html` (modo opcional con Google), `sw.js` (caché), `vermuterias.json` (copia de datos). Sin compilador: GitHub Pages sirve los archivos tal cual.
+- Motor cartográfico: **MapLibre GL JS 4.7.1**. Teselas vectoriales de **OpenFreeMap** (datos de OpenStreetMap).
+- Edificios: extrusión de los polígonos de OpenStreetMap con su altura. **Un polígono extruido es un prisma vertical**: no puede representar torres inclinadas, que se estrechan ni fachadas. Esto es un límite del dato, no un fallo que se pueda corregir con más código.
 
-## 2. Cómo se dibujan los hitos (importante)
+## 2. Cómo se dibujan los hitos
 
-1. **Torres y edificios singulares** (Cuatro Torres, Torre Picasso, Palacio Real, Cibeles…): el mapa base ya trae su **silueta y altura reales**. Cuando están cargadas, `app.js` las lee del propio mapa y dibuja encima una copia con los **colores** del edificio, **franjas** de pisos y su tejado. La forma de los muros es la de OpenStreetMap; los colores y detalles son **aproximados, puestos a mano**.
-2. **Modelo de respaldo**: si la silueta de una torre no llega a leerse tras varios intentos, se muestra el modelo hecho a mano de `hitos.js` (prismas apilados).
-3. **Monumentos sueltos** (Torrespaña, Faro de Moncloa, Obelisco, Puerta de Alcalá): modelos hechos a mano, siempre.
-4. **Extras** (cúpula de la Almudena, torre de Cibeles, cúpula y Ave Fénix de Metrópolis): se colocan por cálculo sobre la silueta y pueden quedar algo desplazados.
-
-El mapa base **ya no oculta** los edificios altos. Antes se ocultaban los de más de 100 m y se sustituían por modelos propios; se cambió porque los modelos inventados eran peores que la silueta real.
+1. **Torres (14)**: el propio mapa selecciona sus edificios por **altura y cercanía** y los dibuja con su color. Se ve la silueta real de OpenStreetMap, pero como **prisma**: las torres Puerta de Europa (inclinadas 15°) y la Torre Moeve (se estrecha) **no** tienen su forma real. Se probó con los filtros reales del estilo y edificios simulados; **no** con teselas reales.
+2. **Monumentos sueltos y Bernabéu**: modelos hechos a mano (Torrespaña, Faro de Moncloa, Obelisco, Puerta de Alcalá, estadio). Son **esquemáticos**: medidas estimadas, sin planos ni fotografías.
+3. **Palacio Real, Cibeles, Almudena, Banco de España, Metrópolis, Telefónica**: se lee la silueta del mapa cuando está cargada y se dibuja encima una copia coloreada, con extras (cúpula, torre) colocados por cálculo. El panel «Diagnóstico de hitos» (Opciones) dice qué se ha leído de cada uno. Resultado **no verificado** con teselas reales.
 
 ## 3. Alternativas evaluadas
 
 | Opción | Hechos comprobados | Decisión |
 |---|---|---|
-| **Google Photorealistic 3D Tiles** (con CesiumJS u otro visor 3D Tiles) | Según la documentación de Google: hay que **activar facturación** y usar **clave de API** u OAuth en todas las peticiones; SKU «Enterprise»; máximo **10.000 consultas raíz al día**; hay normas de atribución/logotipo; y la disponibilidad y los términos **pueden diferir para cuentas con dirección de facturación en el EEE**. | **No implementado.** Requiere una clave y una cuenta de facturación que no existen aquí, y no se puede probar sin ellas. La cobertura de Madrid **no está verificada**. Es la única vía realista a fotorrealismo. |
-| **Datos 3D oficiales del Ayuntamiento de Madrid** | La búsqueda hecha **no encontró** un conjunto 3D abierto oficial con licencia clara. | **No usado.** Sin verificar en el portal oficial. |
-| **MapLibre + edificios vectoriales** (actual) | Motor con licencia BSD. OpenFreeMap: sin registro, sin clave, sin límites de peticiones declarados, **sin SLA**, atribución obligatoria. | **Elegido.** Gratis, rápido, funciona en GitHub Pages. |
-| **Three.js como complemento** | Permitiría curvas reales (cúpulas). | **No aprobado**: no compensa el peso y la complejidad ahora. |
-| **Modo esfera** | — | **No implementado.** Exige una escena 3D propia que no se puede validar sin un navegador real. Queda como módulo futuro. |
+| **Google Photorealistic 3D Tiles** | Según la documentación de Google: **facturación activada** y **clave de API** en todas las peticiones; SKU «Enterprise»; máximo **10.000 consultas raíz al día**; normas de atribución; términos que **pueden diferir para cuentas del EEE**. En el código oficial de CesiumJS 1.124 la carga exige una clave de Google y solo se puede usar con el geocodificador de Google. | **Implementado como página opcional** (`fotorrealista.html`) que pide **tu** clave. **No probado** con una clave real. Es la única vía a edificios con su forma y colores reales. |
+| **Datos 3D oficiales del Ayuntamiento de Madrid** | La búsqueda no encontró un conjunto 3D abierto con licencia clara. | **No usado.** Sin verificar en el portal oficial. |
+| **MapLibre + edificios vectoriales** | Motor BSD. OpenFreeMap: sin registro, sin clave, sin límites declarados, **sin SLA**, atribución obligatoria. | **Base del mapa 2D/3D.** Gratis y rápido. |
+| **Modelos hechos a mano** | Sin planos ni fotografías no se puede garantizar fidelidad. | Solo para monumentos simples; **no** se amplía. |
+| **Modo esfera** | — | **No implementado.** |
 
 ## 4. Qué es real, qué es aproximado y qué es propio
 
-- **Real (OpenStreetMap):** huellas de edificios, alturas (cuando están etiquetadas; si no, 8 m), calles, parques y agua.
+- **Real (OpenStreetMap):** huellas y alturas de edificios (si falta altura, 8 m), calles, parques, agua.
 - **Real (fuentes públicas):** posición y altura de los hitos.
-- **Aproximado:** colores, franjas, tejados y extras de los hitos (hechos a mano, sin fotografías); modelos de respaldo de las torres.
-- **Propio:** los datos de las vermuterías (tu Excel). Sus coordenadas, si no las pones tú, son **aproximadas** (búsqueda en Nominatim).
-- **No existe:** texturas fotográficas, fachadas reales ni fotogrametría en ninguna parte del mapa.
+- **Aproximado:** colores de los hitos y modelos a mano.
+- **Propio:** los datos de las vermuterías (tu Excel).
+- **Fotorrealista real:** solo en `fotorrealista.html`, con datos de Google y bajo sus términos.
 
 ## 5. Pruebas realizadas (resultados reales)
 
-Ejecutadas fuera del navegador, con el código real y un entorno simulado:
+- Sintaxis de todos los archivos: correcta.
+- Estilo del mapa con el **validador oficial de MapLibre**: 0 errores, 30 capas.
+- Filtros de las 14 torres, evaluados con el motor de filtros de MapLibre y edificios simulados: cada torre va a su capa, los podios y edificios ajenos quedan en el mapa base.
+- Lectura del Excel real (37 locales) y del JSON: correcta.
+- Flujo de `fotorrealista.html` con un CesiumJS **simulado**: carga con la clave, coloca la cámara, añade chinchetas y enlaza el clic.
 
-- Sintaxis de `hitos.js` y `app.js`: correcta.
-- Estilo completo del mapa con el **validador oficial de MapLibre**: **0 errores**, 16 capas.
-- Carga de los 37 locales desde `vermuterias.json` y desde el **Excel real**: correcta.
-- Lectura de siluetas con teselas **simuladas**: torres con podio y franjas, edificios con extras, y paso al modelo de respaldo cuando no hay silueta.
-- Vistas previas 3D de varios modelos hechos a mano.
-
-**No** se ha podido probar: render real en GPU, rendimiento en iPhone ni la lectura de teselas reales (`querySourceFeatures`). Los resultados en un navegador real pueden diferir.
+**No** se ha podido probar: render real en GPU, rendimiento en iPhone, teselas reales, ni `fotorrealista.html` con una clave real.
 
 ## 6. Costes y mantenimiento
 
-- Coste en efectivo actual: **0 €**. Dependencias externas **sin garantía de servicio**: OpenFreeMap, Nominatim (una petición por segundo como máximo, con caché), cdnjs.
-- Si OpenFreeMap fallara, el mapa base no cargaría; la alternativa sería alojar teselas propias (PMTiles), que hay que generar fuera de este entorno.
-- Mantenimiento: actualizar el Excel y subirlo. Revisar la versión de MapLibre una vez al año.
+- Mapa 2D/3D: **0 €**; dependencias sin garantía de servicio (OpenFreeMap, Nominatim, cdnjs).
+- Modo fotorrealista: **de pago según el uso** (facturación de Google); revisa precios y términos antes de activarlo.
 
 ## 7. Pendiente
 
-1. Probar en un navegador real y ajustar `PIXEL_RATIO_MAX` y la lectura de siluetas.
-2. Fotorrealismo: crear clave de Google Maps Platform, revisar términos y coste para el EEE, y prototipar con CesiumJS en una página aparte.
+1. Probar en un navegador real y corregir lo que falle.
+2. Probar `fotorrealista.html` con una clave real.
 3. Chinchetas accesibles con teclado (hoy la alternativa es la **Lista**).
 4. Modo esfera como módulo independiente.
