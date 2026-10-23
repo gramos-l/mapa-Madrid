@@ -84,7 +84,11 @@
         P.push({ t: 'box', w: 6, d: 40, z0: 16.5, z1: 19.8, c: '#d9cfb8' });
         P.push({ t: 'box', w: 7.2, d: 44, z0: 19.8, z1: 20.8, c: '#e8e0cc' });
         P.push({ t: 'box', w: 3, d: 6, z0: 20.8, z1: 21.9, c: '#cfc5ac' });
-        return P; })() }
+        return P; })() },
+    { name: 'Estadio Santiago Bernabéu', at: [-3.68835, 40.45306], zoom: 16.6, info: 'Estadio del Real Madrid · inaugurado en 1947', parts: [
+      { t: 'ring', w: 262, d: 222, r: 50, hw: 196, hd: 156, hr: 38, z0: 0, z1: 42, c: '#d0d5da', band: { h: 6, c: '#8f99a3' } },
+      { t: 'ring', w: 262, d: 222, r: 50, hw: 168, hd: 124, hr: 32, z0: 42, z1: 54, c: '#b9c0c7' },
+      { t: 'box', w: 108, d: 70, z0: 0, z1: 0.4, c: '#4f8f3f' } ] }
   ];
 
   /* ---------- Generador de volúmenes ---------- */
@@ -94,6 +98,13 @@
     if (!c) return [[-a, -b], [a, -b], [a, b], [-a, b]];
     c = Math.min(c, a, b);
     return [[-a + c, -b], [a - c, -b], [a, -b + c], [a, b - c], [a - c, b], [-a + c, b], [-a, b - c], [-a, -b + c]];
+  }
+  function roundRect(w, d, r) {
+    const a = w / 2, b = d / 2; r = Math.min(r || 0, a, b);
+    if (!r) return [[-a, -b], [a, -b], [a, b], [-a, b]];
+    const out = [], corners = [[a - r, b - r, 0], [-a + r, b - r, 90], [-a + r, -b + r, 180], [a - r, -b + r, 270]];
+    corners.forEach(c => { for (let i = 0; i <= 6; i++) { const t = (c[2] + i * 15) * Math.PI / 180; out.push([c[0] + r * Math.cos(t), c[1] + r * Math.sin(t)]); } });
+    return out;
   }
   function circlePoly(r, n) { const o = []; for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; o.push([r * Math.cos(a), r * Math.sin(a)]); } return o; }
   function hexRgb(h) { return [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); }
@@ -108,7 +119,7 @@
         const vx = (H.lean.to[0] - H.at[0]) * KLON, vy = (H.lean.to[1] - H.at[1]) * KLAT, L = Math.hypot(vx, vy) || 1;
         lean = { t: Math.tan(rad(H.lean.deg)), x: vx / L, y: vy / L };
       }
-      const add = (poly, dx, dy, z0, z1, c) => {
+      const toLL = (poly, dx, dy) => {
         const ring = poly.map(p => {
           let x = p[0], y = p[1];
           x += dx; y += dy;                                      // desplazamiento local de la pieza
@@ -116,7 +127,12 @@
           return [H.at[0] + xr / KLON, H.at[1] + yr / KLAT];
         });
         ring.push(ring[0]);
-        feats.push({ type: 'Feature', properties: { k: k, b: Math.round(z0 * 100) / 100, h: Math.round(z1 * 100) / 100, c: c }, geometry: { type: 'Polygon', coordinates: [ring] } });
+        return ring;
+      };
+      const add = (poly, dx, dy, z0, z1, c, hole) => {
+        const rings = [toLL(poly, dx, dy)];
+        if (hole) rings.push(toLL(hole, dx, dy));
+        feats.push({ type: 'Feature', properties: { k: k, b: Math.round(z0 * 100) / 100, h: Math.round(z1 * 100) / 100, c: c }, geometry: { type: 'Polygon', coordinates: rings } });
       };
       H.parts.forEach(P => {
         const dx = P.dx || 0, dy = P.dy || 0;
@@ -130,6 +146,15 @@
           }
         }
         else if (P.t === 'cyl') add(circlePoly(P.r, P.n || 22), dx, dy, P.z0, P.z1, P.c);
+        else if (P.t === 'ring') {                                        // volumen con hueco (estadios, patios)
+          const outer = roundRect(P.w, P.d, P.r), inner = roundRect(P.hw, P.hd, P.hr);
+          if (!P.band) add(outer, dx, dy, P.z0, P.z1, P.c, inner);
+          else for (let z = P.z0; z < P.z1 - 0.01; z += P.band.h) {
+            const zm = Math.min(z + P.band.h * 0.78, P.z1), ze = Math.min(z + P.band.h, P.z1);
+            add(outer, dx, dy, z, zm, P.c, inner);
+            if (ze > zm + 0.01) add(outer, dx, dy, zm, ze, P.band.c, inner);
+          }
+        }
         else if (P.t === 'loft') {
           const n = P.n || 8, base = rectPoly(P.w, P.d, P.cham);
           for (let i = 0; i < n; i++) {
@@ -159,8 +184,7 @@
     { name: 'Palacio de Cibeles', at: [-3.69196, 40.41883], probes: grid3(45), r: 150, h: 42, base: 44, wall: '#f1ece2', roof: '#4f565e', roofT: 6, extra: 'cibeles', ref: [-3.69309, 40.41934], zoom: 17, info: '1919 · Antonio Palacios y Joaquín Otamendi' },
     { name: 'Banco de España', at: [-3.69492, 40.41791], probes: grid3(40), r: 150, h: 30, wall: '#e7dcc1', roof: '#6d747c', roofT: 4, zoom: 17, info: '1891 · Eduardo Adaro' },
     { name: 'Edificio Metrópolis', at: [-3.69805, 40.41905], probes: grid3(22), r: 100, h: 40, base: 38, wall: '#f0ebe0', roof: '#59626d', roofT: 5, extra: 'metropolis', ref: [-3.69762, 40.41932], zoom: 18, info: '1911 · Jules y Raymond Février' },
-    { name: 'Edificio Telefónica', at: [-3.701907, 40.420338], probes: grid3(25), r: 120, h: 80, wall: '#cdbb9a', roof: '#5b5147', roofT: 6, zoom: 17.4, info: '88 m · 1929 · primer rascacielos de Madrid' },
-    { name: 'Estadio Santiago Bernabéu', at: [-3.68835, 40.45306], probes: grid3(75), r: 260, h: 48, wall: '#d6dbe0', roof: '#2f353c', roofT: 9, zoom: 16.6, info: 'Estadio del Real Madrid · inaugurado en 1947' }
+    { name: 'Edificio Telefónica', at: [-3.701907, 40.420338], probes: grid3(25), r: 120, h: 80, wall: '#cdbb9a', roof: '#5b5147', roofT: 6, zoom: 17.4, info: '88 m · 1929 · primer rascacielos de Madrid' }
   ];
   const ALL = HITOS.concat(DYN);
   const TOWERS = [];
@@ -325,7 +349,7 @@
 
   // Sitios que se recolorean sobre la silueta real: las torres (con 'osm') y los edificios de DYN
   const SITES = [];
-  ALL.forEach((L, k) => { if (L.osm || L.probes) SITES.push(k); });
+  ALL.forEach((L, k) => { if (L.probes) SITES.push(k); });
 
-  window.VT = { KLON: KLON, KLAT: KLAT, HITOS: HITOS, DYN: DYN, ALL: ALL, HITOS_GEO: HITOS_GEO, SITES: SITES, captureOne: captureOne, diag: diag };
+  window.VT = { KLON: KLON, KLAT: KLAT, HITOS: HITOS, DYN: DYN, ALL: ALL, HITOS_GEO: HITOS_GEO, SITES: SITES, TOWERS: TOWERS, captureOne: captureOne, diag: diag };
 })();
