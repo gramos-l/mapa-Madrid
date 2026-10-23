@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const { KLON, KLAT, HITOS, DYN, ALL, HITOS_GEO, SITES, captureOne } = window.VT;
+  const { KLON, KLAT, HITOS, DYN, ALL, HITOS_GEO, SITES, TOWERS, captureOne } = window.VT;
 
   /* ================== AJUSTES ================== */
   const DATA_XLSX = 'Vermut_Tour_Madrid.xlsx';   // si subes este archivo al repositorio, el mapa lo lee
@@ -75,6 +75,10 @@
 
   const H_EXPR = ['coalesce', ['get', 'render_height'], 8];
   const MINH_EXPR = ['coalesce', ['get', 'render_min_height'], 0];
+  // Torres: se recolorean con un filtro del propio mapa (altura + cercanía a la torre), sin copiar nada por encima.
+  // Así se ve la silueta real completa y no queda ningún trozo del edificio azul del mapa base.
+  const TOWER_R = 70;
+  const towerCond = k => ['all', ['>=', H_EXPR, ALL[k].osm.h * 0.55], ['<', ['distance', { type: 'Point', coordinates: ALL[k].at }], TOWER_R]];
 
   /* ================== ESTILO DEL MAPA (mínimo, rápido) ================== */
   const EXTRUDE_FROM = 15, EXTRUDE_FULL = 16.5, MAX_PITCH_AUTO = 50, FLAT_UNTIL = 14.8, FULL_3D_AT = 16.8;
@@ -109,13 +113,16 @@
         { id: 'autovias', type: 'line', source: S, 'source-layer': 'transportation', minzoom: 9, filter: ['in', 'class', 'motorway', 'trunk'],
           layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': C.motor, 'line-width': wd(3) } },
         { id: 'edificios-3d', type: 'fill-extrusion', source: S, 'source-layer': 'building', minzoom: EXTRUDE_FROM,
-          filter: ['!=', ['get', 'hide_3d'], true],
+          filter: ['all', ['!=', ['get', 'hide_3d'], true], ['!', ['any'].concat(TOWERS.map(towerCond))]],
           paint: {
             'fill-extrusion-height': hx(h),
             'fill-extrusion-base': hx(minH),
             'fill-extrusion-color': ['interpolate', ['linear'], h].concat(C.cols),
             'fill-extrusion-opacity': 1, 'fill-extrusion-vertical-gradient': false
           } },
+      ].concat(TOWERS.map(k => ({ id: 'torre-' + k, type: 'fill-extrusion', source: S, 'source-layer': 'building', minzoom: EXTRUDE_FROM,
+          filter: ['all', ['!=', ['get', 'hide_3d'], true], towerCond(k)],
+          paint: { 'fill-extrusion-height': hx(h), 'fill-extrusion-base': hx(minH), 'fill-extrusion-color': ALL[k].osm.wall, 'fill-extrusion-opacity': 1, 'fill-extrusion-vertical-gradient': true } }))).concat([
         { id: 'hitos-3d', type: 'fill-extrusion', source: 'hitos', minzoom: EXTRUDE_FROM, filter: handFilter(),
           paint: {
             'fill-extrusion-height': hx(['get', 'h']),
@@ -136,7 +143,7 @@
           layout: { 'icon-image': PIN_IMG, 'icon-anchor': 'bottom', 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
         { id: 'pin-sel', type: 'symbol', source: 'vermuterias', filter: selFilter(sel ? sel.idx : null),
           layout: { 'icon-image': PIN_IMG, 'icon-anchor': 'bottom', 'icon-size': 1.35, 'icon-allow-overlap': true, 'icon-ignore-placement': true } }
-      ]
+      ])
     };
   }
 
@@ -244,7 +251,7 @@
   hs.addEventListener('input', () => { hsOut.textContent = '×' + (+hs.value).toFixed(1).replace('.', ','); });
   hs.addEventListener('change', () => {          // se aplica al soltar: recalcular las alturas es costoso
     hScale = +hs.value;
-    [['edificios-3d', H_EXPR, MINH_EXPR], ['hitos-3d', ['get', 'h'], ['get', 'b']], ['hitos-dyn-3d', ['get', 'h'], ['get', 'b']]].forEach(a => {
+    [['edificios-3d', H_EXPR, MINH_EXPR]].concat(TOWERS.map(k => ['torre-' + k, H_EXPR, MINH_EXPR])).concat([['hitos-3d', ['get', 'h'], ['get', 'b']], ['hitos-dyn-3d', ['get', 'h'], ['get', 'b']]]).forEach(a => {
       if (!map.getLayer(a[0])) return;
       map.setPaintProperty(a[0], 'fill-extrusion-height', hx(a[1]));
       map.setPaintProperty(a[0], 'fill-extrusion-base', hx(a[2]));
@@ -497,7 +504,7 @@
       '<h2>' + esc(H.name) + '</h2><p class="zone">' + esc(H.info) + '</p>' +
       '<div class="actions"><a class="main" href="https://www.google.com/maps/search/?api=1&query=' + q + '" target="_blank" rel="noopener">Google Maps</a>' +
       '<a href="https://maps.apple.com/?q=' + q + '&ll=' + H.at[1] + ',' + H.at[0] + '" target="_blank" rel="noopener">Apple Maps</a></div>' +
-      '<p class="note">' + (capState[ALL.indexOf(H)] && capState[ALL.indexOf(H)].done ? 'Silueta y altura reales del mapa; los colores y los detalles añadidos son aproximados.' : 'Modelo 3D aproximado: la posición y la altura son reales; las formas y los colores están simplificados.') + '</p>';
+      '<p class="note">' + (H.osm || (capState[ALL.indexOf(H)] && capState[ALL.indexOf(H)].done) ? 'Silueta y altura reales del mapa; los colores y los detalles añadidos son aproximados.' : 'Modelo 3D aproximado: la posición y la altura son reales; las formas y los colores están simplificados.') + '</p>';
   }
   function selectHito(k, fly) {
     const H = ALL[k]; if (!H) return;
@@ -565,6 +572,9 @@
     }
     const f = map.getLayer('pins') ? map.queryRenderedFeatures([[e.point.x - r, e.point.y - r], [e.point.x + r, e.point.y + r]], { layers: ['pins'] }) : [];
     if (f.length) { const p = places[f[0].properties.idx]; if (p) select(p, true); return; }
+    const tl = TOWERS.map(k => 'torre-' + k).filter(id => map.getLayer(id));
+    const tf = tl.length ? map.queryRenderedFeatures(e.point, { layers: tl }) : [];
+    if (tf.length) { selectHito(+tf[0].layer.id.slice(6), false); return; }
     const hl = ['hitos-3d', 'hitos-dyn-3d'].filter(id => map.getLayer(id));
     const hf = hl.length ? map.queryRenderedFeatures(e.point, { layers: hl }) : [];
     if (hf.length) selectHito(hf[0].properties.k, false);
