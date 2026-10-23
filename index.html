@@ -59,6 +59,10 @@
   #places::-webkit-scrollbar { display: none; }
   #places button { flex: none; }
 
+  #busy { left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    padding: 6px 14px; font-size: 13px; z-index: 2; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  #busy.on { opacity: 1; }
+
   #msg { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); padding: 14px 18px;
     max-width: 320px; text-align: center; display: none; z-index: 3; }
 
@@ -89,8 +93,8 @@
   <div class="ticks"><span>0</span><span>40</span><span>100</span><span>150+ m</span></div>
 </div>
 
+<div id="busy" class="panel">Cargando edificios…</div>
 <div id="places" class="panel" role="group" aria-label="Lugares de Madrid"></div>
-
 <div id="msg" class="panel"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js"></script>
@@ -104,15 +108,18 @@
     { name: 'Gran Vía',           c: [-3.7055, 40.4200], z: 17.0, b: -30 },
     { name: 'Plaza de España',    c: [-3.7122, 40.4234], z: 17.2, b: 160 },
     { name: 'Palacio Real',       c: [-3.7143, 40.4179], z: 17.0, b: -20 },
-    { name: 'Retiro',             c: [-3.6844, 40.4153], z: 16.2, b: 0 },
+    { name: 'Retiro',             c: [-3.6844, 40.4153], z: 16.4, b: 0 },
     { name: 'Atocha',             c: [-3.6893, 40.4065], z: 16.8, b: 40 },
     { name: 'Bernabéu',           c: [-3.6883, 40.4531], z: 17.0, b: -50 },
     { name: 'Cuatro Torres',      c: [-3.6903, 40.4780], z: 16.6, b: 200 }
   ];
 
-  const MAX_PITCH_AUTO = 62;
-  const FLAT_UNTIL = 14.2;   // por debajo: mapa plano
-  const FULL_3D_AT = 16.4;   // por encima: inclinación completa
+  // El 3D empieza más cerca: así solo se construyen los edificios de la zona que ves
+  const EXTRUDE_FROM = 15;     // zoom en el que aparecen los volúmenes
+  const EXTRUDE_FULL = 16.5;   // zoom con la altura completa
+  const MAX_PITCH_AUTO = 55;   // menos inclinación = menos teselas hacia el horizonte
+  const FLAT_UNTIL = 14.8;
+  const FULL_3D_AT = 16.8;
 
   let theme = 'light';
   let auto = true;
@@ -144,7 +151,7 @@
         { id: 'agua', type: 'fill', source: S, 'source-layer': 'water', paint: { 'fill-color': C.water } },
         { id: 'rios', type: 'line', source: S, 'source-layer': 'waterway', minzoom: 11,
           paint: { 'line-color': C.water, 'line-width': wd(1.5) } },
-        { id: 'edificios-planos', type: 'fill', source: S, 'source-layer': 'building', minzoom: 13, maxzoom: 14.5,
+        { id: 'edificios-planos', type: 'fill', source: S, 'source-layer': 'building', minzoom: 13, maxzoom: EXTRUDE_FROM,
           paint: { 'fill-color': C.foot } },
         { id: 'calles-borde', type: 'line', source: S, 'source-layer': 'transportation', minzoom: 10,
           filter: ['in', 'class', 'primary', 'secondary', 'motorway', 'trunk'],
@@ -162,15 +169,16 @@
           filter: ['in', 'class', 'motorway', 'trunk'],
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: { 'line-color': C.motor, 'line-width': wd(3) } },
-        { id: 'edificios-3d', type: 'fill-extrusion', source: S, 'source-layer': 'building', minzoom: 14,
+        { id: 'edificios-3d', type: 'fill-extrusion', source: S, 'source-layer': 'building', minzoom: EXTRUDE_FROM,
           filter: ['!=', ['get', 'hide_3d'], true],
           paint: {
-            // Los edificios "crecen" desde el suelo entre zoom 14 y 16
-            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 16, h],
-            'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 14, 0, 16, minH],
+            // Los edificios "crecen" desde el suelo entre EXTRUDE_FROM y EXTRUDE_FULL
+            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], EXTRUDE_FROM, 0, EXTRUDE_FULL, h],
+            'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], EXTRUDE_FROM, 0, EXTRUDE_FULL, minH],
             'fill-extrusion-color': ['interpolate', ['linear'], h].concat(C.cols),
-            'fill-extrusion-opacity': 0.94,
-            'fill-extrusion-vertical-gradient': true
+            // Opacidad 1 y sin degradado: con transparencia el móvil dibuja los edificios en dos pasadas
+            'fill-extrusion-opacity': 1,
+            'fill-extrusion-vertical-gradient': false
           } }
       ]
     };
@@ -182,11 +190,12 @@
     center: MADRID.center,
     zoom: MADRID.zoom,
     pitch: 0,
-    maxPitch: 78,
+    maxPitch: 70,
     minZoom: 10.5,
-    maxZoom: 19.5,
+    maxZoom: 19,
     maxBounds: BOUNDS,
     fadeDuration: 0,
+    pixelRatio: Math.min(window.devicePixelRatio || 1, 2),  // el iPhone usa 3: con 2 se ve igual de nítido y pesa mucho menos
     attributionControl: false
   });
 
@@ -224,13 +233,20 @@
   const statsEl = document.getElementById('stats');
   function updateHud() {
     const z = map.getZoom(), p = map.getPitch();
-    const is3d = z >= 14 && p > 4;
+    const is3d = z >= EXTRUDE_FROM && p > 4;
     modeEl.textContent = is3d ? '3D' : '2D';
     modeEl.classList.toggle('is3d', is3d);
     statsEl.textContent = 'zoom ' + z.toFixed(1) + ' · inclinación ' + Math.round(p) + '°';
   }
   map.on('move', updateHud);
   map.on('load', updateHud);
+
+  /* ---------- Aviso de carga de edificios ---------- */
+  const busy = document.getElementById('busy');
+  map.on('dataloading', e => {
+    if (e.dataType === 'source' && map.getZoom() >= EXTRUDE_FROM - 0.5) busy.classList.add('on');
+  });
+  map.on('idle', () => busy.classList.remove('on'));
 
   /* ---------- Lugares ---------- */
   const placesEl = document.getElementById('places');
