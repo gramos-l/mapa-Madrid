@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vermut Tour · Madrid fotorrealista</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Widgets/widgets.css">
+<style>
+  :root { --panel: rgba(255,255,255,.96); --ink: #1c2330; --muted: #68707e; --line: rgba(28,35,48,.14); --accent: #2f5bea; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: #0f141b; color: var(--ink); font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #cesium { position: absolute; inset: 0; }
+  .panel { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; z-index: 5; }
+  #top { top: calc(10px + env(safe-area-inset-top, 0px)); left: 10px; right: 10px; padding: 8px 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  #top b { font-size: 15px; margin-right: auto; }
+  a.btn, button { font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 99px; padding: 6px 12px; cursor: pointer; text-decoration: none; white-space: nowrap; }
+  button.main { background: var(--accent); color: #fff; border-color: var(--accent); }
+  #places { left: 0; right: 0; bottom: 0; border-radius: 16px 16px 0 0; padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 8px; overflow-x: auto; }
+  #places button { flex: none; }
+  #card { left: 10px; right: 10px; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); padding: 12px 14px; display: none; max-width: 520px; }
+  #card h2 { margin: 0 30px 2px 0; font-size: 18px; }
+  #card p { margin: 2px 0; color: var(--muted); }
+  #card .x { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; padding: 0; border-radius: 50%; }
+  #setup { inset: 70px 10px auto 10px; max-width: 560px; padding: 14px 16px; display: none; }
+  #setup h2 { margin: 0 0 6px; font-size: 18px; }
+  #setup p, #setup li { color: var(--muted); font-size: 13px; }
+  #setup input { width: 100%; padding: 10px 12px; margin: 8px 0; border: 1px solid var(--line); border-radius: 10px; font: inherit; }
+  #msg { top: 64px; left: 10px; right: 10px; padding: 10px 14px; display: none; max-width: 560px; }
+  #msg.err { border-color: #b3261e; }
+</style>
+</head>
+<body>
+<div id="cesium"></div>
+
+<div id="top" class="panel">
+  <b>Madrid fotorrealista</b>
+  <a class="btn" href="index.html">← Mapa</a>
+  <button id="chg" type="button" hidden>Cambiar clave</button>
+</div>
+
+<div id="setup" class="panel">
+  <h2>Necesitas una clave de Google</h2>
+  <p>Este modo usa «Photorealistic 3D Tiles» de Google (edificios reales con fotografías). No es gratuito por defecto y no funciona sin tu propia clave:</p>
+  <ol>
+    <li>En Google Cloud, crea un proyecto y <b>activa la facturación</b>.</li>
+    <li>Activa la API <b>Map Tiles API</b> y crea una clave.</li>
+    <li><b>Restringe la clave</b> al sitio <code>https://gramos-l.github.io/*</code> (la clave será visible en esta página).</li>
+    <li>Revisa el precio y los términos para tu país: Google indica que pueden cambiar para cuentas del Espacio Económico Europeo.</li>
+  </ol>
+  <input id="key" type="password" placeholder="Pega aquí tu clave de API" autocomplete="off">
+  <button id="save" class="main" type="button">Guardar y cargar Madrid</button>
+  <p>La clave se guarda solo en este navegador. No se sube a ningún sitio.</p>
+</div>
+
+<div id="msg" class="panel"></div>
+<div id="card" class="panel"><button class="x" type="button" id="cx" aria-label="Cerrar">✕</button><h2 id="ct"></h2><p id="cz"></p><p id="ca"></p><p id="cp"></p></div>
+<div id="places" class="panel" role="group" aria-label="Lugares"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const KEY_STORE = 'vt-google-key', GEO_KEY = 'vermut-geo-v1';
+  const norm = s => String(s == null ? '' : s).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const PLACES = [
+    ['Cuatro Torres', -3.6880, 40.4775, 1100, 20], ['Torre Picasso', -3.693016, 40.45031, 700, 30], ['Bernabéu', -3.68835, 40.45306, 650, 25],
+    ['Cibeles', -3.69196, 40.41883, 600, 30], ['Palacio Real', -3.71433, 40.41796, 650, 20], ['Puerta del Sol', -3.7038, 40.4169, 500, 30], ['Gran Vía', -3.7055, 40.4204, 650, 40]
+  ];
+
+  function say(text, err) { const m = $('msg'); m.textContent = text; m.className = 'panel' + (err ? ' err' : ''); m.style.display = text ? 'block' : 'none'; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+  let viewer = null;
+
+  async function start(key) {
+    $('setup').style.display = 'none'; $('chg').hidden = false;
+    say('Cargando Madrid fotorrealista… (la primera vez puede tardar)');
+    try {
+      if (!window.Cesium) throw new Error('No se pudo cargar CesiumJS. Comprueba tu conexión.');
+      const C = window.Cesium;
+      viewer = new C.Viewer('cesium', {
+        globe: false, baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false,
+        navigationHelpButton: false, animation: false, timeline: false, fullscreenButton: false, infoBox: false, selectionIndicator: false
+      });
+      // Google exige mostrar su atribución (Cesium la dibuja abajo: no la ocultes) y usar solo su geocodificador (aquí no hay ninguno)
+      const tileset = await C.createGooglePhotorealistic3DTileset({ key: key, onlyUsingWithGoogleGeocoder: true });
+      viewer.scene.primitives.add(tileset);
+      flyTo(PLACES[5][1], PLACES[5][2], 1800, 35, true);
+      say('');
+      await addPins(C);
+    } catch (err) {
+      const m = String(err && err.message || err);
+      say('No se pudo cargar Madrid. ' + (/40[13]|denied|forbidden|key|API/i.test(m)
+        ? 'Parece un problema de la clave: revisa que sea correcta, que la «Map Tiles API» esté activada, que haya facturación y que el sitio esté permitido. '
+        : '') + 'Detalle: ' + m, true);
+      $('chg').hidden = false;
+    }
+  }
+
+  function flyTo(lon, lat, range, pitchDeg, instant) {
+    const C = window.Cesium, target = C.Cartesian3.fromDegrees(lon, lat, 680);
+    const off = new C.HeadingPitchRange(C.Math.toRadians(0), C.Math.toRadians(-pitchDeg), range);
+    const sphere = new C.BoundingSphere(target, 1);
+    if (instant) viewer.camera.viewBoundingSphere(sphere, off);
+    else viewer.camera.flyToBoundingSphere(sphere, { offset: off, duration: 2.2 });
+  }
+
+  async function addPins(C) {
+    let rows = [], geo = {};
+    try { geo = JSON.parse(localStorage.getItem(GEO_KEY) || '{}'); } catch (e) { geo = {}; }
+    try { const r = await fetch('vermuterias.json', { cache: 'no-cache' }); if (r.ok) rows = await r.json(); } catch (e) { rows = []; }
+    const pts = [];
+    rows.forEach(x => {
+      let lat = parseFloat(String(x['Latitud'] || '').replace(',', '.')), lon = parseFloat(String(x['Longitud'] || '').replace(',', '.'));
+      if (!isFinite(lat) || !isFinite(lon)) { const g = geo[norm(x['Nombre']) + '|' + norm(x['Calle y número'])]; if (g) { lat = g.lat; lon = g.lon; } }
+      if (isFinite(lat) && isFinite(lon)) pts.push({ x: x, lat: lat, lon: lon });
+    });
+    if (!pts.length) { say('No hay vermuterías localizadas todavía: abre una vez el mapa 2D para que se localicen y vuelve aquí.', true); return; }
+    let heights = pts.map(() => 700);
+    try {
+      if (viewer.scene.sampleHeightSupported) {
+        const carto = pts.map(p => C.Cartographic.fromDegrees(p.lon, p.lat));
+        const out = await viewer.scene.sampleHeightMostDetailed(carto);
+        heights = out.map((c, i) => (c && isFinite(c.height)) ? c.height : heights[i]);
+      }
+    } catch (e) { /* se usa una altura aproximada */ }
+    pts.forEach((p, i) => {
+      const done = /^s[ií]$/i.test(String(p.x['Visitado'] || ''));
+      viewer.entities.add({
+        position: C.Cartesian3.fromDegrees(p.lon, p.lat, heights[i] + 8),
+        point: { pixelSize: 13, color: C.Color.fromCssColorString(done ? '#2e8b57' : '#b3261e'), outlineColor: C.Color.WHITE, outlineWidth: 2, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+        label: { text: String(p.x['Nombre'] || ''), font: '600 12px sans-serif', fillColor: C.Color.WHITE, outlineColor: C.Color.BLACK, outlineWidth: 3, style: C.LabelStyle.FILL_AND_OUTLINE,
+          pixelOffset: new C.Cartesian2(0, -18), distanceDisplayCondition: new C.DistanceDisplayCondition(0, 1800), disableDepthTestDistance: Number.POSITIVE_INFINITY },
+        properties: { vt: p.x }
+      });
+    });
+    const h = new C.ScreenSpaceEventHandler(viewer.scene.canvas);
+    h.setInputAction(ev => {
+      const picked = viewer.scene.pick(ev.position);
+      if (picked && picked.id && picked.id.properties && picked.id.properties.vt) {
+        const x = picked.id.properties.vt.getValue(C.JulianDate.now());
+        $('ct').textContent = x['Nombre'] || ''; $('cz').textContent = x['Zona / barrio'] || '';
+        $('ca').textContent = x['Calle y número'] || ''; $('cp').textContent = [x['Qué pedir'], x['Precio orientativo']].filter(Boolean).join(' · ');
+        $('card').style.display = 'block';
+      }
+    }, C.ScreenSpaceEventType.LEFT_CLICK);
+  }
+
+  PLACES.forEach(p => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = p[0];
+    b.addEventListener('click', () => { if (viewer) flyTo(p[1], p[2], p[3], p[4], false); });
+    $('places').appendChild(b);
+  });
+  $('cx').addEventListener('click', () => { $('card').style.display = 'none'; });
+  $('chg').addEventListener('click', () => { $('setup').style.display = 'block'; });
+  $('save').addEventListener('click', () => {
+    const k = $('key').value.trim(); if (!k) return;
+    try { localStorage.setItem(KEY_STORE, k); } catch (e) { /* sin almacenamiento */ }
+    if (viewer) { location.reload(); } else start(k);
+  });
+
+  let saved = ''; try { saved = localStorage.getItem(KEY_STORE) || ''; } catch (e) { saved = ''; }
+  if (saved) start(saved); else $('setup').style.display = 'block';
+})();
+</script>
+</body>
+</html>
