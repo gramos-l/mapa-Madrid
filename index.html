@@ -19,7 +19,7 @@
     --prio-explorar: #6b5aa8;
 
     --bg: #eeece6;
-    --panel: rgba(255,255,255,.92);
+    --panel: rgba(255,255,255,.96);
     --ink: #1c2330;
     --muted: #68707e;
     --line: rgba(28,35,48,.13);
@@ -27,7 +27,7 @@
   }
   :root[data-theme="dark"] {
     --bg: #171c25;
-    --panel: rgba(24,29,38,.93);
+    --panel: rgba(24,29,38,.96);
     --ink: #eef1f6;
     --muted: #98a1b0;
     --line: rgba(255,255,255,.15);
@@ -38,8 +38,7 @@
     font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   #map { position: absolute; inset: 0; }
 
-  .panel { position: absolute; background: var(--panel); border: 1px solid var(--line);
-    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-radius: 14px; }
+  .panel { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
   button { font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--line);
     border-radius: 99px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
   button:hover { border-color: var(--accent); }
@@ -85,21 +84,9 @@
   #msg { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); padding: 14px 18px;
     max-width: 320px; text-align: center; display: none; z-index: 5; }
 
-  /* Chinchetas */
-  .pinwrap { width: 28px; height: 36px; }
-  .pin { all: unset; box-sizing: border-box; display: block; width: 28px; height: 36px; cursor: pointer;
-    transform-origin: 50% 100%; transition: transform .15s; filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
-  .pin svg { display: block; }
-  .pin path { fill: var(--pin-pendiente); stroke: #fff; stroke-width: 1.6; }
-  .pin.done path { fill: var(--pin-visitada); }
-  .pin.approx path { stroke-dasharray: 3 2; }
-  .pin.sel { transform: scale(1.35); }
-  .pin:focus-visible { outline: 2px solid var(--accent); border-radius: 6px; }
-
   /* Hojas inferiores (ficha y lista) */
   .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 4; max-height: 62vh; overflow-y: auto;
     background: var(--panel); border: 1px solid var(--line); border-bottom: 0; border-radius: 18px 18px 0 0;
-    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     padding: 8px 16px calc(18px + env(safe-area-inset-bottom, 0px)); display: none;
     box-shadow: 0 -8px 30px rgba(0,0,0,.18); overscroll-behavior: contain; }
   .sheet.open { display: block; }
@@ -208,6 +195,7 @@
   const SHEET = 'Vermuterías';
   const SHEETJS = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
   const GEO_KEY = 'vermut-geo-v1';
+  const PIXEL_RATIO_MAX = 1.5;   // más bajo = más fluido; súbelo a 2 si prefieres más nitidez
 
   const MADRID = { center: [-3.7038, 40.4168], zoom: 12, pitch: 0, bearing: 0 };
   const BOUNDS = [[-3.95, 40.25], [-3.45, 40.62]];
@@ -237,7 +225,7 @@
   const eur = n => (Math.round(n * 100) / 100).toString().replace('.', ',') + ' €';
 
   /* ================== ESTILO DEL MAPA (mínimo, rápido) ================== */
-  const EXTRUDE_FROM = 15, EXTRUDE_FULL = 16.5, MAX_PITCH_AUTO = 55, FLAT_UNTIL = 14.8, FULL_3D_AT = 16.8;
+  const EXTRUDE_FROM = 15, EXTRUDE_FULL = 16.5, MAX_PITCH_AUTO = 50, FLAT_UNTIL = 14.8, FULL_3D_AT = 16.8;
 
   function makeStyle(t) {
     const dk = t === 'dark';
@@ -252,7 +240,7 @@
     const S = 'ofm';
     return {
       version: 8, name: 'madrid-3d',
-      sources: { ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' } },
+      sources: { ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' }, vermuterias: { type: 'geojson', data: geojson() } },
       light: { anchor: 'viewport', position: [1.4, 215, 35], color: dk ? '#9fb0d8' : '#ffffff', intensity: dk ? 0.35 : 0.42 },
       layers: [
         { id: 'fondo', type: 'background', paint: { 'background-color': C.bg } },
@@ -275,18 +263,49 @@
             'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], EXTRUDE_FROM, 0, EXTRUDE_FULL, minH],
             'fill-extrusion-color': ['interpolate', ['linear'], h].concat(C.cols),
             'fill-extrusion-opacity': 1, 'fill-extrusion-vertical-gradient': false
-          } }
+          } },
+        { id: 'pins', type: 'symbol', source: 'vermuterias', filter: pinFilter(),
+          layout: { 'icon-image': PIN_IMG, 'icon-anchor': 'bottom', 'icon-allow-overlap': true, 'icon-ignore-placement': true } },
+        { id: 'pin-sel', type: 'symbol', source: 'vermuterias', filter: selFilter(sel ? sel.idx : null),
+          layout: { 'icon-image': PIN_IMG, 'icon-anchor': 'bottom', 'icon-size': 1.35, 'icon-allow-overlap': true, 'icon-ignore-placement': true } }
       ]
     };
   }
 
   let theme = 'light', auto = true, userMoved = false;
+  let places = [], filter = 'all', sel = null;
+
+  /* ---- Chinchetas dibujadas por el propio mapa (GPU): mucho más fluido que elementos HTML ---- */
+  function geojson() {
+    return { type: 'FeatureCollection', features: places.filter(p => p.located).map(p => ({
+      type: 'Feature', properties: { idx: p.idx, done: p.visited, approx: p.approx },
+      geometry: { type: 'Point', coordinates: [p.lon, p.lat] } })) };
+  }
+  const pinFilter = () => filter === 'todo' ? ['==', ['get', 'done'], false] : filter === 'done' ? ['==', ['get', 'done'], true] : ['all'];
+  const selFilter = i => ['==', ['get', 'idx'], i == null ? -1 : i];
+  const PIN_IMG = ['concat', ['case', ['get', 'done'], 'pin-done', 'pin-todo'], ['case', ['get', 'approx'], '-a', '']];
+  const PIN_PATH = 'M14 1.8C7.2 1.8 2 7 2 13.4 2 21.8 14 34.2 14 34.2S26 21.8 26 13.4C26 7 20.8 1.8 14 1.8z';
+  function pinImage(id) {
+    const done = id.indexOf('done') > -1, dashed = /-a$/.test(id);
+    const css = getComputedStyle(document.documentElement);
+    const fill = (css.getPropertyValue(done ? '--pin-visitada' : '--pin-pendiente') || '#b3261e').trim();
+    const S = 2, c = document.createElement('canvas');
+    c.width = 28 * S; c.height = 36 * S;
+    const x = c.getContext('2d'); x.scale(S, S);
+    const path = new Path2D(PIN_PATH);
+    x.fillStyle = fill; x.fill(path);
+    x.lineWidth = 1.6; x.strokeStyle = '#fff'; if (dashed) x.setLineDash([3, 2]); x.stroke(path);
+    x.setLineDash([]); x.beginPath(); x.arc(14, 13.6, 4.6, 0, Math.PI * 2); x.fillStyle = '#fff'; x.fill();
+    return x.getImageData(0, 0, c.width, c.height);
+  }
+  function ensureImage(id) { if (id.indexOf('pin-') === 0 && !map.hasImage(id)) map.addImage(id, pinImage(id), { pixelRatio: 2 }); }
 
   const map = new maplibregl.Map({
     container: 'map', style: makeStyle(theme),
-    center: MADRID.center, zoom: MADRID.zoom, pitch: 0, maxPitch: 70,
+    center: MADRID.center, zoom: MADRID.zoom, pitch: 0, maxPitch: 60,
     minZoom: 10.5, maxZoom: 19, maxBounds: BOUNDS, fadeDuration: 0,
-    pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+    renderWorldCopies: false, refreshExpiredTiles: false,
+    pixelRatio: Math.min(window.devicePixelRatio || 1, PIXEL_RATIO_MAX),
     attributionControl: false
   });
   map.addControl(new maplibregl.AttributionControl({
@@ -300,7 +319,12 @@
     const t = Math.min(1, Math.max(0, (z - FLAT_UNTIL) / (FULL_3D_AT - FLAT_UNTIL)));
     return t * t * (3 - 2 * t) * MAX_PITCH_AUTO;
   }
-  map.on('zoom', () => { if (auto) map.setPitch(targetPitch(map.getZoom())); });
+  // La inclinación se ajusta al terminar el zoom (no en cada fotograma): así el gesto va suave
+  map.on('zoomend', () => {
+    if (!auto) return;
+    const t = targetPitch(map.getZoom());
+    if (Math.abs(t - map.getPitch()) > 1.5) map.easeTo({ pitch: t, duration: 450 });
+  });
   map.on('movestart', e => { if (e.originalEvent) userMoved = true; });
   const autoBox = $('auto');
   map.on('pitchstart', e => { if (e.originalEvent && auto) { auto = false; autoBox.checked = false; } });
@@ -309,23 +333,28 @@
     if (auto) map.easeTo({ pitch: targetPitch(map.getZoom()), duration: 600 });
   });
 
+  const hud = $('hud');
   const modeEl = $('mode'), statsEl = $('stats');
-  function updateHud() {
+  let hudT = 0, lastMode = null;
+  function updateHud(force) {
+    const now = performance.now();
+    if (!force && now - hudT < 150) return;
+    hudT = now;
     const z = map.getZoom(), p = map.getPitch();
     const is3d = z >= EXTRUDE_FROM && p > 4;
-    modeEl.textContent = is3d ? '3D' : '2D';
-    modeEl.classList.toggle('is3d', is3d);
-    statsEl.textContent = 'zoom ' + z.toFixed(1) + ' · inclinación ' + Math.round(p) + '°';
+    if (is3d !== lastMode) { lastMode = is3d; modeEl.textContent = is3d ? '3D' : '2D'; modeEl.classList.toggle('is3d', is3d); }
+    if (!hud.classList.contains('collapsed')) statsEl.textContent = 'zoom ' + z.toFixed(1) + ' · inclinación ' + Math.round(p) + '°';
   }
-  map.on('move', updateHud);
-  map.on('load', updateHud);
+  map.on('move', () => updateHud(false));
+  map.on('moveend', () => updateHud(true));
+  map.on('load', () => updateHud(true));
 
   const busy = $('busy');
-  map.on('dataloading', e => { if (e.dataType === 'source' && map.getZoom() >= EXTRUDE_FROM - 0.5) busy.classList.add('on'); });
-  map.on('idle', () => busy.classList.remove('on'));
+  let busyOn = false;
+  map.on('dataloading', e => { if (!busyOn && e.dataType === 'source' && map.getZoom() >= EXTRUDE_FROM - 0.5) { busyOn = true; busy.classList.add('on'); } });
+  map.on('idle', () => { if (busyOn) { busyOn = false; busy.classList.remove('on'); } });
 
   /* ---- Panel de opciones ---- */
-  const hud = $('hud');
   if (window.innerWidth >= 700) hud.classList.remove('collapsed');
   $('toggleHud').addEventListener('click', () => {
     const c = hud.classList.toggle('collapsed');
@@ -351,9 +380,6 @@
   map.on('idle', () => { msg.style.display = 'none'; });
 
   /* ================== DATOS ================== */
-  let places = [];
-  const markers = new Map();
-  let filter = 'all', sel = null;
 
   function toPlace(raw, idx, estMap) {
     const nm = {};
@@ -465,7 +491,7 @@
         try { hit = await geocodePlace(p); netErrors = 0; if (hit) { geoCache[k] = hit; saveGeo(); } await sleep(1100); }
         catch (e) { netErrors++; hit = null; if (netErrors >= 3) break; await sleep(1500); }
       }
-      if (hit) { p.lat = hit.lat; p.lon = hit.lon; p.approx = !!hit.approx; p.located = true; addPin(p); }
+      if (hit) { p.lat = hit.lat; p.lon = hit.lon; p.approx = !!hit.approx; p.located = true; syncPins(); }
       else p.failed = true;
       done++;
       geoText.textContent = 'Localizando vermuterías… ' + done + '/' + todo.length;
@@ -488,41 +514,25 @@
     map.fitBounds(b, { padding: { top: 90, bottom: 90, left: 40, right: 40 }, maxZoom: 13.6, duration: 900 });
   }
 
-  /* ================== CHINCHETAS ================== */
+  /* ================== CHINCHETAS (capa del mapa) ================== */
   function match(p) { return filter === 'all' || (filter === 'todo' && !p.visited) || (filter === 'done' && p.visited); }
-
-  function addPin(p) {
-    if (!p.located || markers.has(p.idx)) { refreshPin(p); return; }
-    const wrap = document.createElement('div');
-    wrap.className = 'pinwrap';
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'pin';
-    b.setAttribute('aria-label', p.name);
-    b.innerHTML = '<svg viewBox="0 0 28 36" width="28" height="36" aria-hidden="true"><path d="M14 1.8C7.2 1.8 2 7 2 13.4 2 21.8 14 34.2 14 34.2S26 21.8 26 13.4C26 7 20.8 1.8 14 1.8z"/><circle cx="14" cy="13.6" r="4.6" fill="#fff"/></svg>';
-    wrap.appendChild(b);
-    b.addEventListener('click', ev => { ev.stopPropagation(); select(p, true); });
-    const m = new maplibregl.Marker({ element: wrap, anchor: 'bottom' }).setLngLat([p.lon, p.lat]).addTo(map);
-    markers.set(p.idx, { marker: m, wrap: wrap, btn: b });
-    refreshPin(p);
+  map.on('style.load', () => ['pin-todo', 'pin-done', 'pin-todo-a', 'pin-done-a'].forEach(ensureImage));
+  map.on('styleimagemissing', e => ensureImage(e.id));
+  let syncT = 0;
+  function syncPins() {
+    clearTimeout(syncT);
+    syncT = setTimeout(() => { const src = map.getSource('vermuterias'); if (src) src.setData(geojson()); }, 80);
   }
-  function refreshPin(p) {
-    const m = markers.get(p.idx);
-    if (!m) return;
-    m.btn.classList.toggle('done', p.visited);
-    m.btn.classList.toggle('approx', p.approx);
-    m.btn.classList.toggle('sel', sel === p);
-    m.wrap.style.display = match(p) ? '' : 'none';
-    m.wrap.style.zIndex = sel === p ? 3 : '';
-  }
-  function clearPins() { markers.forEach(m => m.marker.remove()); markers.clear(); }
+  function setSel(p) { if (map.getLayer('pin-sel')) map.setFilter('pin-sel', selFilter(p ? p.idx : null)); }
+  map.on('mouseenter', 'pins', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'pins', () => { map.getCanvas().style.cursor = ''; });
 
   /* ================== FICHA ================== */
   const card = $('card'), listEl = $('list');
   function closeSheets() {
     card.classList.remove('open'); listEl.classList.remove('open');
     document.body.classList.remove('sheet-open');
-    const prev = sel; sel = null; if (prev) refreshPin(prev);
+    if (sel) { sel = null; setSel(null); }
   }
   function openSheet(el) {
     card.classList.remove('open'); listEl.classList.remove('open');
@@ -566,9 +576,7 @@
   }
 
   function select(p, fly) {
-    const prev = sel; sel = p;
-    if (prev) refreshPin(prev);
-    refreshPin(p);
+    sel = p; setSel(p);
     card.innerHTML = cardHtml(p);
     openSheet(card);
     if (fly && p.located) {
@@ -604,18 +612,23 @@
   $('btnList').addEventListener('click', () => { renderList(); openSheet(listEl); });
   document.querySelectorAll('#bar [data-f]').forEach(b => b.addEventListener('click', () => {
     filter = b.dataset.f;
-    places.forEach(refreshPin);
+    if (map.getLayer('pins')) map.setFilter('pins', pinFilter());
     renderList();
   }));
   document.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeSheets(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
-  map.on('click', () => { if (card.classList.contains('open')) closeSheets(); });
+  map.on('click', e => {
+    const r = 5;
+    const f = map.getLayer('pins') ? map.queryRenderedFeatures([[e.point.x - r, e.point.y - r], [e.point.x + r, e.point.y + r]], { layers: ['pins'] }) : [];
+    if (f.length) { const p = places[f[0].properties.idx]; if (p) select(p, true); }
+    else if (card.classList.contains('open')) closeSheets();
+  });
 
   /* ================== ARRANQUE ================== */
   function setPlaces(list) {
-    clearPins(); closeSheets();
+    closeSheets();
     places = list.map((p, i) => { p.idx = i; return p; });
-    places.forEach(addPin);
+    syncPins();
     renderList();
     fitAll();
     geocodeAll();
