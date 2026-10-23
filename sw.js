@@ -1,15 +1,14 @@
 /* Caché del mapa de Madrid: las teselas y la librería se guardan en el móvil
    para que las siguientes visitas carguen casi al instante.
-   El Excel (.xlsx) y los datos (.json) se piden siempre primero a internet,
-   para que tus cambios se vean en cuanto los subes. */
-const SHELL = 'madrid3d-shell-v2';
+   La propia página, el Excel (.xlsx) y los datos (.json) se piden SIEMPRE primero a internet
+   (saltándose la caché del navegador), para que veas tus cambios en cuanto los subes. */
+const SHELL = 'madrid3d-shell-v3';
 const TILES = 'madrid3d-tiles-v1';
 const MAX_TILES = 1500;
 
 self.addEventListener('install', e => {
   self.skipWaiting();
   e.waitUntil(caches.open(SHELL).then(c => Promise.allSettled([
-    './', 'index.html',
     'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js',
     'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.css'
   ].map(u => c.add(u)))));
@@ -52,6 +51,22 @@ async function staleWhileRevalidate(req, name) {
   return hit || net;
 }
 
+// Red primero y sin usar la caché del navegador; si no hay conexión, lo último guardado
+async function freshFirst(req, name, ms) {
+  const cache = await caches.open(name);
+  const net = fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }).then(res => {
+    if (res && res.ok) cache.put(req, res.clone());
+    return res;
+  });
+  const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms));
+  try {
+    return await Promise.race([net, timeout]);
+  } catch (err) {
+    const hit = await cache.match(req);
+    return hit || net;
+  }
+}
+
 async function networkFirst(req, name, ms) {
   const cache = await caches.open(name);
   const net = fetch(req).then(res => {
@@ -78,9 +93,9 @@ self.addEventListener('fetch', e => {
     } else {
       e.respondWith(networkFirst(req, TILES, 2500));
     }
-  } else if (url.origin === self.location.origin && /\.(xlsx|json)$/i.test(url.pathname)) {
-    e.respondWith(networkFirst(req, SHELL, 4000));
-  } else if (url.hostname === 'cdnjs.cloudflare.com' || url.origin === self.location.origin) {
+  } else if (url.origin === self.location.origin) {
+    e.respondWith(freshFirst(req, SHELL, 4000));
+  } else if (url.hostname === 'cdnjs.cloudflare.com') {
     e.respondWith(staleWhileRevalidate(req, SHELL));
   }
 });
