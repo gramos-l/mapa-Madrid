@@ -26,6 +26,7 @@
       let s = (d3 ? (d3.rich ? '✓ ' : '· ') : '? ') + L.name + ': ';
       if (d3) s += d3.rich ? 'detalle real (' + d3.elems + ' elem., ' + d3.parts + ' partes, ' + d3.shapes + ' tejados, ' + d3.colours + ' colores)' : 'sin detalle en OSM (' + d3.elems + ' elem.), se usa el método básico';
       else s += 'sin datos todavía';
+      if (d3 && d3.insp) s += '\n    usado: ' + (d3.insp.used.join('/') || '—') + ' m · dibujado: ' + d3.feats + ' piezas, máx ' + Math.round(d3.maxH || 0) + ' m · sin usar cerca: ' + d3.insp.other + (d3.insp.tallOther.length ? ' (altos: ' + d3.insp.tallOther.join('/') + ')' : '');
       if (d && !d3) s += ' · mapa base: ' + (d.out > 0 ? 'OK ' + d.out + ' piezas' : 'sin silueta, leídos ' + d.feats);
       lines.push(s);
     });
