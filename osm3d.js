@@ -8,7 +8,7 @@
   const ALL = VT.ALL, KLON = VT.KLON, KLAT = VT.KLAT;
 
   const ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
-  const STORE = 'vt-osm3d-v3', VERSION = 3, TTL = 30 * 24 * 3600 * 1000, LV = 3.3;
+  const STORE = 'vt-osm3d-v4', VERSION = 4, TTL = 30 * 24 * 3600 * 1000, LV = 3.3;
 
   /* ---------- colores ---------- */
   const NAMES = { white: '#ffffff', black: '#000000', grey: '#808080', gray: '#808080', lightgrey: '#d3d3d3', lightgray: '#d3d3d3', darkgrey: '#a9a9a9', darkgray: '#a9a9a9',
@@ -153,7 +153,11 @@
       if (m == null) m = num(t['building:min_height']);
       const ml = num(t['building:min_level']); if (m == null && ml != null) m = ml * LV;
       m = m || 0;
-      if (!(h > m + 0.5)) return;
+      const tallPart = tower && h >= S.h * 0.55;
+      if (!(h > m + 0.5)) {
+        if (tallPart) m = 0;                       // dato incoherente (altura mínima ≥ altura): se dibuja desde el suelo
+        else { (stats.drop = stats.drop || []).push('h' + Math.round(h) + ' mín' + Math.round(m)); return; }
+      }
       const tagged = cssColor(t['building:colour']) || cssColor(t['building:facade:colour']) || cssColor(t.colour);
       const mat = MATERIAL[String(t['building:material'] || t['building:facade:material'] || '').toLowerCase()];
       const wall = tagged || mat || defWall;
@@ -163,7 +167,8 @@
       const shape = String(t['roof:shape'] || t['building:roof:shape'] || '').toLowerCase();
       if (shape && shape !== 'flat') stats.shapes++;
       let rings = [e.outer.map(p => [r6(p[0]), r6(p[1])])].concat(e.holes.map(hr => hr.map(p => [r6(p[0]), r6(p[1])])));
-      if (!tower) rings = inflate(rings, 0.9);          // las copias de edificios bajos envuelven al del mapa base
+      const staysInBase = !tower || h < S.h * 0.55;      // los cuerpos altos de las torres los oculta el filtro; el resto, no
+      if (staysInBase) { rings = inflate(rings, 0.9); h += 0.25; }   // la copia envuelve al edificio del mapa base y no se pisan
       const ax = axes(e.outer);
       let roofH = num(t['roof:height']) || num(t['building:roof:height']);
       const sloped = shape && shape !== 'flat' && /dome|onion|pyramid|cone|hipped|gabled|half|skillion|mansard|gambrel|saltbox|round/.test(shape);
@@ -189,7 +194,11 @@
       } else if (roofTag) emit(rings, h - 0.6, h + 0.05, roof);
     });
     stats.feats = out.length;
-    stats.rich = stats.parts > 0 || stats.shapes > 0 || stats.colours > 0 || stats.elems >= 3;
+    const maxTop = out.reduce((m, f) => Math.max(m, f.properties.h), 0);
+    const detail = stats.parts > 0 || stats.shapes > 0 || stats.colours > 0 || stats.elems >= 3;
+    // sin piezas dibujadas, o con una torre sin su cuerpo alto, se mantiene el método básico: así nada desaparece
+    stats.rich = detail && out.length > 0 && (!tower || maxTop >= S.h * 0.7);
+    if (detail && !stats.rich) stats.why = out.length ? 'solo cuerpos bajos' : 'ninguna pieza dibujable';
     return { feats: out, stats: stats };
   }
 
@@ -304,7 +313,7 @@
 
   function diagFill() {
     if (!data) return;
-    Object.keys(data.sites).forEach(k => { const s = data.sites[k].stats; VT.diag3d[k] = { rich: data.sites[k].rich, elems: s.elems, parts: s.parts, shapes: s.shapes, colours: s.colours, feats: s.feats, maxH: s.maxH, insp: s.insp }; });
+    Object.keys(data.sites).forEach(k => { const s = data.sites[k].stats; VT.diag3d[k] = { rich: data.sites[k].rich, elems: s.elems, parts: s.parts, shapes: s.shapes, colours: s.colours, feats: s.feats, maxH: s.maxH, insp: s.insp, why: s.why, drop: s.drop }; });
     VT.osm3dStatus = 'listo: ' + richKeys().length + ' de ' + Object.keys(data.sites).length + ' hitos con detalle real (' + data.n + ' elementos leídos)';
   }
   function saveCache() { try { localStorage.setItem(STORE, JSON.stringify(data)); } catch (e) { /* demasiado grande: se usa solo en esta sesión */ } }
