@@ -474,11 +474,12 @@
       '<h2>' + esc(p.name) + '</h2><p class="zone">' + esc(p.zone) + '</p>' + photo +
       '<div class="chips">' + prio + (p.visited ? '<span class="chip ok">Visitada ✓</span>' : '<span class="chip todo">Pendiente</span>') +
       (p.price ? '<span class="chip">' + esc(p.price) + '</span>' : '') + '</div>' +
-      '<div class="actions"><a class="main" href="' + g + '" target="_blank" rel="noopener">Google Maps</a><a href="' + a + '" target="_blank" rel="noopener">Apple Maps</a></div>' +
+      '<div class="actions"><a class="main" href="' + g + '" target="_blank" rel="noopener">Google Maps</a><a href="' + a + '" target="_blank" rel="noopener">Apple Maps</a><button type="button" class="editbtn" data-edit="' + p.idx + '">Editar</button></div>' +
       '<dl>' + row('Dirección', esc(p.addr)) + row('Tipo de local', esc(p.type)) + row('Qué pedir', esc(p.order)) +
       row('Precio', precio) + row('Para 2 personas', estN != null ? '≈ ' + eur(estN) : '') + row('Notas', esc(p.notes)) + '</dl>' +
       (visitRows ? '<h3>Vuestra visita</h3><dl>' + visitRows + '</dl>' : '') +
       (src ? '<p class="link-src"><a href="' + esc(src) + '" target="_blank" rel="noopener">Fuente: ' + esc(host || 'enlace') + '</a></p>' : '') +
+      (p._edited ? '<p class="note">Datos editados en este móvil.</p>' : '') +
       (p.approx ? '<p class="note">Ubicación aproximada en el mapa. Para afinarla, escribe Latitud y Longitud en el Excel.</p>' : '') +
       (!p.located ? '<p class="note">Todavía sin ubicar en el mapa. Añade Latitud y Longitud en el Excel.</p>' : '');
   }
@@ -584,7 +585,7 @@
   /* ================== ARRANQUE ================== */
   function setPlaces(list) {
     closeSheets();
-    places = list.map((p, i) => { p.idx = i; return p; });
+    places = list.map((p, i) => { p.idx = i; if (window.VT.edits) window.VT.edits.apply(p); return p; });
     syncPins();
     renderList();
     fitAll();
@@ -614,6 +615,10 @@
     }
     e.target.value = '';
   });
+
+  // para el editor (editor.js)
+  window.VT.app = { places: () => places, select: select, map: map, COL: COL, geocode: geocodeAll,
+    refresh: () => { syncPins(); renderList(); } };
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
