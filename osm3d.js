@@ -8,7 +8,7 @@
   const ALL = VT.ALL, KLON = VT.KLON, KLAT = VT.KLAT;
 
   const ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
-  const STORE = 'vt-osm3d-v1', VERSION = 1, TTL = 30 * 24 * 3600 * 1000, LV = 3.3;
+  const STORE = 'vt-osm3d-v2', VERSION = 2, TTL = 30 * 24 * 3600 * 1000, LV = 3.3;
 
   /* ---------- colores ---------- */
   const NAMES = { white: '#ffffff', black: '#000000', grey: '#808080', gray: '#808080', lightgrey: '#d3d3d3', lightgray: '#d3d3d3', darkgrey: '#a9a9a9', darkgray: '#a9a9a9',
@@ -190,36 +190,64 @@
     ALL.forEach((L, k) => { if (/Bernab/.test(L.name)) s.add(k); });
     return Array.from(s);
   }
+  function bboxOf(L, r) {
+    const dLat = r / KLAT, dLon = r / KLON;
+    return [L.at[1] - dLat, L.at[0] - dLon, L.at[1] + dLat, L.at[0] + dLon].map(v => v.toFixed(5)).join(',');
+  }
+  // cajas rectangulares en vez de círculos: Overpass las resuelve mucho más rápido
   function queryText(ks) {
     const parts = [];
     ks.forEach(k => {
-      const L = ALL[k], r = L.osm ? 110 : Math.max(L.r || 150, /Bernab/.test(L.name) ? 220 : 0);
-      ['way["building"]', 'way["building:part"]', 'relation["building"]', 'relation["building:part"]'].forEach(t => parts.push(t + '(around:' + r + ',' + L.at[1] + ',' + L.at[0] + ');'));
+      const L = ALL[k], r = L.osm ? 110 : Math.max(L.r || 150, /Bernab/.test(L.name) ? 220 : 0), b = bboxOf(L, r);
+      ['way["building"]', 'way["building:part"]', 'relation["building"]', 'relation["building:part"]'].forEach(t => parts.push(t + '(' + b + ');'));
     });
-    return '[out:json][timeout:60];(' + parts.join('') + ');out tags geom;';
+    return '[out:json][timeout:40];(' + parts.join('') + ');out tags geom;';
   }
+  // tandas de 7 hitos ordenados de sur a norte: peticiones pequeñas en lugar de una enorme
+  function batches(ks) {
+    const s = ks.slice().sort((a, b) => ALL[a].at[1] - ALL[b].at[1]), out = [];
+    for (let i = 0; i < s.length; i += 7) out.push(s.slice(i, i + 7));
+    return out;
+  }
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
   async function fetchOverpass(q, fetchFn) {
     let last = null;
     for (const ep of ENDPOINTS) {
-      try {
-        const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, timer = ctl ? setTimeout(() => ctl.abort(), 50000) : 0;
-        const r = await fetchFn(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl ? ctl.signal : undefined });
-        if (timer) clearTimeout(timer);
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const j = await r.json();
-        if (j && Array.isArray(j.elements)) return j;
-        throw new Error('respuesta vacía');
-      } catch (e) { last = e; }
+      for (let intento = 0; intento < 2; intento++) {
+        let timer = 0;
+        try {
+          const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+          if (ctl) timer = setTimeout(() => ctl.abort(), 45000);
+          const r = await fetchFn(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl ? ctl.signal : undefined });
+          if (timer) clearTimeout(timer);
+          if (!r.ok) throw new Error('servidor ocupado (HTTP ' + r.status + ')');
+          const j = await r.json();
+          if (j && Array.isArray(j.elements)) {
+            if (!j.elements.length && j.remark) throw new Error('el servidor no terminó: ' + String(j.remark).slice(0, 80));
+            return j;
+          }
+          throw new Error('respuesta vacía');
+        } catch (e) {
+          if (timer) clearTimeout(timer);
+          last = (e && e.name === 'AbortError') ? new Error('tiempo de espera agotado') : e;
+          await sleep(intento === 0 ? 1500 : 0);
+        }
+      }
     }
     throw last || new Error('sin respuesta');
   }
-  async function build(fetchFn) {
-    const ks = sitesList(), json = await fetchOverpass(queryText(ks), fetchFn), elems = elementsFromOverpass(json), res = {};
+  async function buildBatch(ks, fetchFn) {
+    const json = await fetchOverpass(queryText(ks), fetchFn), elems = elementsFromOverpass(json), res = {};
     ks.forEach(k => { const c = convert(k, selectFor(k, elems)); res[k] = { rich: c.stats.rich, stats: c.stats, feats: c.stats.rich ? c.feats : [] }; });
-    return { v: VERSION, t: Date.now(), n: (json.elements || []).length, sites: res };
+    return { n: (json.elements || []).length, sites: res };
+  }
+  async function build(fetchFn) {          // (para pruebas) todas las tandas seguidas
+    const all = { v: VERSION, t: Date.now(), n: 0, sites: {} };
+    for (const b of batches(sitesList())) { const r = await buildBatch(b, fetchFn); all.n += r.n; Object.assign(all.sites, r.sites); }
+    return all;
   }
 
-  VT.osm3d = { cssColor: cssColor, joinRings: joinRings, elementsFromOverpass: elementsFromOverpass, selectFor: selectFor, convert: convert, queryText: queryText, build: build, sitesList: sitesList };
+  VT.osm3d = { cssColor: cssColor, joinRings: joinRings, elementsFromOverpass: elementsFromOverpass, selectFor: selectFor, convert: convert, queryText: queryText, build: build, buildBatch: buildBatch, batches: batches, sitesList: sitesList };
   VT.diag3d = {}; VT.osm3dStatus = 'pendiente';
 
   /* ---------- integración con el mapa ---------- */
@@ -270,17 +298,29 @@
     Object.keys(data.sites).forEach(k => { const s = data.sites[k].stats; VT.diag3d[k] = { rich: data.sites[k].rich, elems: s.elems, parts: s.parts, shapes: s.shapes, colours: s.colours, feats: s.feats }; });
     VT.osm3dStatus = 'listo: ' + richKeys().length + ' de ' + Object.keys(data.sites).length + ' hitos con detalle real (' + data.n + ' elementos leídos)';
   }
+  function saveCache() { try { localStorage.setItem(STORE, JSON.stringify(data)); } catch (e) { /* demasiado grande: se usa solo en esta sesión */ } }
   async function load() {
-    try { const c = JSON.parse(localStorage.getItem(STORE) || 'null'); if (c && c.v === VERSION && Date.now() - c.t < TTL) { data = c; diagFill(); VT.osm3dStatus += ' · desde la memoria del móvil'; render(); return; } } catch (e) { /* sin caché */ }
-    say('Cargando el detalle real de los edificios (OpenStreetMap), solo esta vez…');
-    VT.osm3dStatus = 'descargando…';
-    try {
-      data = await build(fetch.bind(window));
-      try { localStorage.setItem(STORE, JSON.stringify(data)); } catch (e) { /* demasiado grande: se usa solo en esta sesión */ }
-      diagFill(); render(); say('Detalle real cargado.', 2500);
-    } catch (e) {
-      VT.osm3dStatus = 'no se pudo descargar: ' + (e && e.message ? e.message : e);
-      say('No se pudo cargar el detalle de OpenStreetMap. Se usa el mapa básico.', 6000);
+    data = { v: VERSION, t: Date.now(), n: 0, sites: {} };
+    try { const c = JSON.parse(localStorage.getItem(STORE) || 'null'); if (c && c.v === VERSION && c.sites && Date.now() - c.t < TTL) data = c; } catch (e) { /* sin caché */ }
+    const all = sitesList(), missing = all.filter(k => !data.sites[k]);
+    if (Object.keys(data.sites).length) { diagFill(); render(); }
+    if (!missing.length) { VT.osm3dStatus += ' · desde la memoria del móvil'; return; }
+    const tandas = batches(missing); let ok = 0, lastErr = null;
+    for (let i = 0; i < tandas.length; i++) {
+      say('Cargando el detalle real de los edificios (OpenStreetMap), solo esta vez… ' + (i + 1) + '/' + tandas.length);
+      VT.osm3dStatus = 'descargando ' + (i + 1) + '/' + tandas.length + '…';
+      try {
+        const r = await buildBatch(tandas[i], fetch.bind(window));
+        data.n += r.n; Object.assign(data.sites, r.sites); ok++;
+        saveCache(); diagFill(); render();
+      } catch (e) { lastErr = e; }
+    }
+    if (ok === tandas.length) { say('Detalle real cargado.', 2500); }
+    else {
+      const why = lastErr && lastErr.message ? lastErr.message : String(lastErr);
+      diagFill();
+      VT.osm3dStatus += ' · ' + (tandas.length - ok) + ' de ' + tandas.length + ' tandas sin cargar (' + why + '); se reintentará en la próxima visita';
+      say(ok ? 'Detalle de OpenStreetMap cargado a medias (' + why + ').' : 'No se pudo cargar el detalle de OpenStreetMap (' + why + '). Se usa el mapa básico.', 7000);
     }
   }
 
