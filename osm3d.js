@@ -8,7 +8,7 @@
   const ALL = VT.ALL, KLON = VT.KLON, KLAT = VT.KLAT;
 
   const ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
-  const STORE = 'vt-osm3d-v2', VERSION = 2, TTL = 30 * 24 * 3600 * 1000, LV = 3.3;
+  const STORE = 'vt-osm3d-v3', VERSION = 3, TTL = 30 * 24 * 3600 * 1000, LV = 3.3;
 
   /* ---------- colores ---------- */
   const NAMES = { white: '#ffffff', black: '#000000', grey: '#808080', gray: '#808080', lightgrey: '#d3d3d3', lightgray: '#d3d3d3', darkgrey: '#a9a9a9', darkgray: '#a9a9a9',
@@ -132,6 +132,15 @@
     return list;
   }
 
+  // para el diagnóstico: alturas de lo usado y de lo que hay cerca sin usar (posibles cuerpos que faltan o cajas que asoman)
+  function inspect(k, elems, list) {
+    const L = ALL[k], ids = new Set(list.map(e => e.id)), hint = L.osm ? L.osm.h : (L.h || 30);
+    const near = elems.filter(e => !ids.has(e.id) && dist(centroid(e.outer), L.at) < 90);
+    const tall = near.filter(e => { const h = hOf(e); return h != null && h >= hint * 0.4; });
+    const show = e => Math.round(hOf(e) || 0) + (isPart(e) ? 'p' : '');
+    return { used: list.map(show).slice(0, 8), other: near.length, tallOther: tall.slice(0, 5).map(show) };
+  }
+
   /* ---------- volúmenes ---------- */
   function convert(k, list) {
     const L = ALL[k], S = L.osm || L, tower = !!L.osm;
@@ -238,7 +247,7 @@
   }
   async function buildBatch(ks, fetchFn) {
     const json = await fetchOverpass(queryText(ks), fetchFn), elems = elementsFromOverpass(json), res = {};
-    ks.forEach(k => { const c = convert(k, selectFor(k, elems)); res[k] = { rich: c.stats.rich, stats: c.stats, feats: c.stats.rich ? c.feats : [] }; });
+    ks.forEach(k => { const list = selectFor(k, elems), c = convert(k, list); c.stats.insp = inspect(k, elems, list); c.stats.maxH = c.feats.reduce((m, f) => Math.max(m, f.properties.h), 0); res[k] = { rich: c.stats.rich, stats: c.stats, feats: c.stats.rich ? c.feats : [] }; });
     return { n: (json.elements || []).length, sites: res };
   }
   async function build(fetchFn) {          // (para pruebas) todas las tandas seguidas
@@ -295,7 +304,7 @@
 
   function diagFill() {
     if (!data) return;
-    Object.keys(data.sites).forEach(k => { const s = data.sites[k].stats; VT.diag3d[k] = { rich: data.sites[k].rich, elems: s.elems, parts: s.parts, shapes: s.shapes, colours: s.colours, feats: s.feats }; });
+    Object.keys(data.sites).forEach(k => { const s = data.sites[k].stats; VT.diag3d[k] = { rich: data.sites[k].rich, elems: s.elems, parts: s.parts, shapes: s.shapes, colours: s.colours, feats: s.feats, maxH: s.maxH, insp: s.insp }; });
     VT.osm3dStatus = 'listo: ' + richKeys().length + ' de ' + Object.keys(data.sites).length + ' hitos con detalle real (' + data.n + ' elementos leídos)';
   }
   function saveCache() { try { localStorage.setItem(STORE, JSON.stringify(data)); } catch (e) { /* demasiado grande: se usa solo en esta sesión */ } }
