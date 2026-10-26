@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const { KLON, KLAT, HITOS, DYN, ALL, HITOS_GEO, SITES, TOWERS, captureOne } = window.VT;
+  const { KLON, KLAT, HITOS, DYN, ALL, HITOS_GEO, SITES, TOWERS, captureOne, usedIds } = window.VT;
 
   /* ================== AJUSTES ================== */
   const DATA_XLSX = 'Vermut_Tour_Madrid.xlsx';   // si subes este archivo al repositorio, el mapa lo lee
@@ -56,7 +56,7 @@
     dynBusy = true;
     try {
       const c = map.getCenter(), bnd = map.getBounds();
-      let changed = false, handChanged = false;
+      let changed = false, handChanged = false, idsChanged = false;
       SITES.forEach(k => {
         const L = ALL[k], st = capState[k];
         if (st.done || st.fallback) return;
@@ -64,11 +64,16 @@
         if (!near && !bnd.contains(L.at)) return;
         st.tries++;
         const f = captureOne(map, L, k);
-        if (f.length) { st.done = true; dynFeats[k] = f; changed = true; }
+        if (f.length) {
+          st.done = true; dynFeats[k] = f; changed = true;
+          const ids = usedIds[k];   // edificios reales ya identificados: se pueden ocultar del mapa base por id exacto
+          if (ids) ids.forEach(id => { if (!excludedBaseIds.has(id)) { excludedBaseIds.add(id); idsChanged = true; } });
+        }
         else if (st.tries >= 8 && HITOS[k] && HITOS[k].parts) { st.fallback = true; handShow.add(k); handChanged = true; }
       });
       if (changed) { const src = map.getSource('hitosdyn'); if (src) src.setData(dynGeo()); }
       if (handChanged) refreshHand();
+      if (idsChanged && map.getLayer('edificios-3d')) map.setFilter('edificios-3d', baseExcludeFilter());
     } catch (e) { /* se reintenta en la siguiente pausa del mapa */ }
     dynBusy = false;
   }
@@ -77,8 +82,20 @@
   const MINH_EXPR = ['coalesce', ['get', 'render_min_height'], 0];
   // Torres: se recolorean con un filtro del propio mapa (altura + cercanía a la torre), sin copiar nada por encima.
   // Así se ve la silueta real completa y no queda ningún trozo del edificio azul del mapa base.
-  const TOWER_R = 70;
-  const towerCond = k => ['all', ['>=', H_EXPR, ALL[k].osm.h * 0.55], ['<', ['distance', { type: 'Point', coordinates: ALL[k].at }], TOWER_R]];
+  const TOWER_R = 70, SITE_R = 90;   // SITE_R: hitos DYN (Palacio Real, Cibeles...), edificios más anchos que una torre
+  const siteH = k => (ALL[k].osm ? ALL[k].osm.h : ALL[k].h);   // torres: altura dentro de osm; hitos DYN: altura directa
+  const towerCond = k => ['all', ['>=', H_EXPR, siteH(k) * 0.55], ['<', ['distance', { type: 'Point', coordinates: ALL[k].at }], TOWER_R]];
+  // Hitos DYN: su edificio base también hay que ocultarlo del mapa genérico (si no, el bloque azul sin colorear
+  // asoma por encima de la copia real cuando esta es más baja, p. ej. el Ayuntamiento/Palacio de Cibeles).
+  const siteCond = k => ['all', ['>=', H_EXPR, siteH(k) * 0.55], ['<', ['distance', { type: 'Point', coordinates: ALL[k].at }], SITE_R]];
+  // Una vez captureOne() confirma qué edificio real (id de la tesela) es cada hito DYN, lo añadimos aquí:
+  // así se oculta justo ese edificio del mapa base, sin depender de adivinar por altura/distancia.
+  const excludedBaseIds = new Set();
+  function baseExcludeFilter() {
+    const any = ['any'].concat(TOWERS.map(towerCond)).concat(SITES.map(siteCond));
+    if (excludedBaseIds.size) any.push(['in', ['id'], ['literal', Array.from(excludedBaseIds)]]);
+    return ['all', ['!=', ['get', 'hide_3d'], true], ['!', any]];
+  }
 
   /* ================== ESTILO DEL MAPA (mínimo, rápido) ================== */
   const EXTRUDE_FROM = 15, EXTRUDE_FULL = 16.5, MAX_PITCH_AUTO = 50, FLAT_UNTIL = 14.8, FULL_3D_AT = 16.8;
@@ -113,7 +130,7 @@
         { id: 'autovias', type: 'line', source: S, 'source-layer': 'transportation', minzoom: 9, filter: ['in', 'class', 'motorway', 'trunk'],
           layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': C.motor, 'line-width': wd(3) } },
         { id: 'edificios-3d', type: 'fill-extrusion', source: S, 'source-layer': 'building', minzoom: EXTRUDE_FROM,
-          filter: ['all', ['!=', ['get', 'hide_3d'], true], ['!', ['any'].concat(TOWERS.map(towerCond))]],
+          filter: baseExcludeFilter(),
           paint: {
             'fill-extrusion-height': hx(h),
             'fill-extrusion-base': hx(minH),

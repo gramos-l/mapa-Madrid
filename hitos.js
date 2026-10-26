@@ -190,6 +190,7 @@
   const TOWERS = [];
   ALL.forEach((L, k) => { if (L.osm) TOWERS.push(k); });
   const diag = {};   // qué ha leído el mapa de cada sitio (para el panel «Diagnóstico»)
+  const usedIds = {};   // ids reales (del mapa base) de los edificios usados por cada hito, una vez capturado
   /* geometría sobre lon/lat */
   const ringArea = r => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += r[j][0] * r[i][1] - r[i][0] * r[j][1]; return a / 2; };
   function inRing(p, r) {
@@ -298,7 +299,7 @@
         polysOf(f.geometry).forEach(poly => {
           if (!inPoly(pt, poly)) return;
           const key = keyOf(poly);
-          if (!cand.has(key)) cand.set(key, { poly: poly, a: Math.abs(ringArea(poly[0])), h: +f.properties.render_height || 0, m: +f.properties.render_min_height || 0 });
+          if (!cand.has(key)) cand.set(key, { poly: poly, a: Math.abs(ringArea(poly[0])), h: +f.properties.render_height || 0, m: +f.properties.render_min_height || 0, id: f.id });
         });
       });
     });
@@ -318,7 +319,7 @@
           });
           if (bestK !== k || bestD > 130) return;
           const key = keyOf(poly);
-          if (!cand.has(key)) { cand.set(key, { poly: poly, a: Math.abs(ringArea(poly[0])), h: h, m: +f.properties.render_min_height || 0 }); tall++; }
+          if (!cand.has(key)) { cand.set(key, { poly: poly, a: Math.abs(ringArea(poly[0])), h: h, m: +f.properties.render_min_height || 0, id: f.id }); tall++; }
         });
       });
     }
@@ -344,6 +345,9 @@
     });
     if (L.extra && EXTRAS[L.extra] && big) EXTRAS[L.extra](L, k, big, hBig, out);
     diag[k].out = out.length;
+    // ids reales de los edificios usados: así el mapa base puede ocultar justo esos, sin adivinar por altura/distancia
+    const ids = new Set(); cand.forEach(c => { if (c.id != null) ids.add(c.id); });
+    usedIds[k] = ids;
     return out;
   }
 
@@ -351,5 +355,5 @@
   const SITES = [];
   ALL.forEach((L, k) => { if (L.probes) SITES.push(k); });
 
-  window.VT = { KLON: KLON, KLAT: KLAT, HITOS: HITOS, DYN: DYN, ALL: ALL, HITOS_GEO: HITOS_GEO, SITES: SITES, TOWERS: TOWERS, captureOne: captureOne, diag: diag };
+  window.VT = { KLON: KLON, KLAT: KLAT, HITOS: HITOS, DYN: DYN, ALL: ALL, HITOS_GEO: HITOS_GEO, SITES: SITES, TOWERS: TOWERS, captureOne: captureOne, diag: diag, usedIds: usedIds };
 })();
