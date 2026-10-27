@@ -114,6 +114,7 @@
     return {
       version: 8, name: 'madrid-3d',
       projection: { type: 'globe' },   // converge con mercator a partir de zoom ~12; solo se nota al alejar del todo
+      glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
       sources: { ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' }, vermuterias: { type: 'geojson', data: geojson(), cluster: true, clusterRadius: 46, clusterMaxZoom: 14 }, hitos: { type: 'geojson', data: HITOS_GEO }, hitosdyn: { type: 'geojson', data: dynGeo() } },
       light: { anchor: 'viewport', position: [1.4, 215, 35], color: dk ? '#d9a86a' : '#fff4e0', intensity: dk ? 0.35 : 0.42 },
       // atmósfera del globo en la intro: visible muy alejado, se desvanece al acercarse (se nota poco pasado zoom 5-7)
@@ -145,6 +146,19 @@
             'fill-extrusion-color': ['interpolate', ['linear'], h].concat(C.cols),
             'fill-extrusion-opacity': 1, 'fill-extrusion-vertical-gradient': false
           } },
+        // nombres de calle: aparecen a partir de cierto zoom para orientarse, las principales un poco antes que las menores
+        { id: 'calles-nombres-principales', type: 'symbol', source: S, 'source-layer': 'transportation_name', minzoom: 12,
+          filter: ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary'],
+          layout: { 'symbol-placement': 'line', 'text-field': ['coalesce', ['get', 'name:es'], ['get', 'name']],
+            'text-font': ['Noto Sans Regular'], 'text-size': ['interpolate', ['linear'], ['zoom'], 12, 11, 17, 13.5],
+            'text-rotation-alignment': 'map', 'text-pitch-alignment': 'viewport', 'symbol-spacing': 300, 'text-letter-spacing': 0.02 },
+          paint: { 'text-color': dk ? '#f0e4d0' : '#2b2016', 'text-halo-color': dk ? '#241a14' : '#f3e9d8', 'text-halo-width': 1.3 } },
+        { id: 'calles-nombres-menores', type: 'symbol', source: S, 'source-layer': 'transportation_name', minzoom: 14.5,
+          filter: ['in', 'class', 'minor', 'tertiary', 'service'],
+          layout: { 'symbol-placement': 'line', 'text-field': ['coalesce', ['get', 'name:es'], ['get', 'name']],
+            'text-font': ['Noto Sans Regular'], 'text-size': ['interpolate', ['linear'], ['zoom'], 14.5, 10.5, 18, 13],
+            'text-rotation-alignment': 'map', 'text-pitch-alignment': 'viewport', 'symbol-spacing': 250, 'text-letter-spacing': 0.02 },
+          paint: { 'text-color': dk ? '#cbb89c' : '#5a4a38', 'text-halo-color': dk ? '#241a14' : '#f3e9d8', 'text-halo-width': 1.2 } },
       ].concat(TOWERS.map(k => ({ id: 'torre-' + k, type: 'fill-extrusion', source: S, 'source-layer': 'building', minzoom: EXTRUDE_FROM,
           filter: ['all', ['!=', ['get', 'hide_3d'], true], towerCond(k)],
           paint: { 'fill-extrusion-height': hx(h), 'fill-extrusion-base': hx(minH), 'fill-extrusion-color': ALL[k].osm.wall, 'fill-extrusion-opacity': 1, 'fill-extrusion-vertical-gradient': true } }))).concat([
