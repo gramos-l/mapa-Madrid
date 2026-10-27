@@ -1,34 +1,37 @@
-  /* ====== COLORES: cámbialos aquí ====== */
+  /* ====== COLORES: estética castiza (granate, crema, verde botella) — cámbialos aquí ====== */
   :root {
-    --pin-pendiente: #b3261e;   /* chincheta de las vermuterías por visitar */
-    --pin-visitada: #2e8b57;    /* chincheta de las visitadas */
-    --prio-muy-alta: #b3261e;
-    --prio-alta: #d9822b;
-    --prio-media: #3d7ea6;
-    --prio-baja: #7b8794;
-    --prio-explorar: #6b5aa8;
+    --pin-pendiente: #a3281f;   /* chincheta de las vermuterías por visitar */
+    --pin-visitada: #2f5233;    /* chincheta de las visitadas: verde botella */
+    --prio-muy-alta: #8c2f39;
+    --prio-alta: #c17817;
+    --prio-media: #a68a3f;
+    --prio-baja: #8a7a68;
+    --prio-explorar: #6b4257;
 
-    --bg: #eeece6;
-    --panel: rgba(255,255,255,.96);
-    --ink: #1c2330;
-    --muted: #68707e;
-    --line: rgba(28,35,48,.13);
-    --accent: #2f5bea;
+    --bg: #f3e9d8;
+    --panel: rgba(250,243,230,.78);
+    --ink: #2b2016;
+    --muted: #7a6a55;
+    --line: rgba(43,32,22,.14);
+    --accent: #7a2530;
+    --serif: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
   }
   :root[data-theme="dark"] {
-    --bg: #171c25;
-    --panel: rgba(24,29,38,.96);
-    --ink: #eef1f6;
-    --muted: #98a1b0;
-    --line: rgba(255,255,255,.15);
-    --accent: #7ea2ff;
+    --bg: #241a14;
+    --panel: rgba(43,30,22,.72);
+    --ink: #f0e4d0;
+    --muted: #b8a68c;
+    --line: rgba(240,228,208,.15);
+    --accent: #d4a24c;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink);
     font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  #map { position: absolute; inset: 0; }
+  /* detrás del lienzo: solo se ve durante la intro del globo (zoom muy bajo), siempre tapado por el mapa a partir de ahí */
+  #map { position: absolute; inset: 0; background: #05070d; }
 
   .panel { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+  .panel, .sheet { backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3); }
   button { font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--line);
     border-radius: 99px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
   button:hover { border-color: var(--accent); }
@@ -38,7 +41,7 @@
   /* Panel superior */
   #hud { top: calc(10px + env(safe-area-inset-top, 0px)); left: 10px; padding: 10px 12px; min-width: 176px; z-index: 2; }
   #hud .top { display: flex; align-items: center; gap: 8px; }
-  #hud h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
+  #hud h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.01em; font-family: var(--serif); }
   #toggleHud { padding: 2px 9px; font-size: 12px; margin-left: auto; }
   #mode { display: inline-block; padding: 2px 9px; border-radius: 99px; font-weight: 600; font-size: 12px;
     background: var(--line); color: var(--muted); transition: background .25s, color .25s; }
@@ -51,8 +54,8 @@
 
   #legend { top: calc(10px + env(safe-area-inset-top, 0px)); right: 56px; padding: 10px 12px; font-size: 12px; z-index: 2; }
   #legend .bar { height: 8px; width: 120px; border-radius: 4px; margin: 6px 0 3px;
-    background: linear-gradient(90deg, #dfe3ea, #b9c6e8, #7f9be0, #4a63c7, #2b2f7a); }
-  :root[data-theme="dark"] #legend .bar { background: linear-gradient(90deg, #3a4150, #4b5a86, #5f7bd0, #8fa8ff, #d6e0ff); }
+    background: linear-gradient(90deg, #e8d9bd, #d4b483, #b98a4a, #8c5a2e, #5c3a1e); }
+  :root[data-theme="dark"] #legend .bar { background: linear-gradient(90deg, #3a2e22, #5c4530, #8c6a3e, #c49a52, #e8c374); }
   #legend .ticks { display: flex; justify-content: space-between; color: var(--muted); }
 
   /* Barra inferior */
@@ -83,7 +86,7 @@
   @media (min-width: 700px) { .sheet { left: 50%; right: auto; width: 520px; transform: translateX(-50%); } }
   .grab { width: 38px; height: 4px; border-radius: 4px; background: var(--line); margin: 0 auto 8px; }
   .close { position: absolute; top: 10px; right: 12px; width: 32px; height: 32px; padding: 0; border-radius: 50%; line-height: 1; font-size: 15px; }
-  .sheet h2 { margin: 6px 40px 2px 0; font-size: 20px; letter-spacing: -.01em; }
+  .sheet h2 { margin: 6px 40px 2px 0; font-size: 21px; letter-spacing: -.01em; font-family: var(--serif); }
   .sheet .zone { margin: 0 0 10px; color: var(--muted); }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
   .chip { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 600;

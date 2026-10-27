@@ -102,20 +102,28 @@
 
   function makeStyle(t) {
     const dk = t === 'dark';
+    // estética castiza: calles y edificios en tonos tierra/latón en vez de azules fríos
     const C = dk
-      ? { bg: '#171c25', green: '#1d2a25', water: '#0e2236', casing: '#10141a', minor: '#2a3240', major: '#3b4658', motor: '#4c5a72', foot: '#232a36',
-          cols: [0, '#3a4150', 40, '#4b5a86', 100, '#5f7bd0', 150, '#8fa8ff', 220, '#d6e0ff'] }
-      : { bg: '#eeece6', green: '#d3e4c4', water: '#a9cbea', casing: '#d6d1c5', minor: '#ffffff', major: '#ffffff', motor: '#fbe9c9', foot: '#e0dcd2',
-          cols: [0, '#dfe3ea', 40, '#b9c6e8', 100, '#7f9be0', 150, '#4a63c7', 220, '#2b2f7a'] };
+      ? { bg: '#241a14', green: '#2e3620', water: '#1c2e30', casing: '#140d08', minor: '#3a2c1e', major: '#4a3826', motor: '#5c4428', foot: '#2e2318',
+          cols: [0, '#3a2e22', 40, '#5c4530', 100, '#8c6a3e', 150, '#c49a52', 220, '#e8c374'] }
+      : { bg: '#f3e9d8', green: '#c9d1a0', water: '#9cb9bd', casing: '#d9c7a8', minor: '#fff8ec', major: '#fff4e0', motor: '#f0c988', foot: '#e8dcc3',
+          cols: [0, '#e8d9bd', 40, '#d4b483', 100, '#b98a4a', 150, '#8c5a2e', 220, '#5c3a1e'] };
     const wd = b => ['interpolate', ['exponential', 1.5], ['zoom'], 10, b * 0.15, 14, b, 18, b * 8];
     const h = H_EXPR, minH = MINH_EXPR;
     const S = 'ofm';
     return {
       version: 8, name: 'madrid-3d',
+      projection: { type: 'globe' },   // converge con mercator a partir de zoom ~12; solo se nota al alejar del todo
       sources: { ofm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' }, vermuterias: { type: 'geojson', data: geojson(), cluster: true, clusterRadius: 46, clusterMaxZoom: 14 }, hitos: { type: 'geojson', data: HITOS_GEO }, hitosdyn: { type: 'geojson', data: dynGeo() } },
-      light: { anchor: 'viewport', position: [1.4, 215, 35], color: dk ? '#9fb0d8' : '#ffffff', intensity: dk ? 0.35 : 0.42 },
+      light: { anchor: 'viewport', position: [1.4, 215, 35], color: dk ? '#d9a86a' : '#fff4e0', intensity: dk ? 0.35 : 0.42 },
+      // atmósfera del globo en la intro: visible muy alejado, se desvanece al acercarse (se nota poco pasado zoom 5-7)
+      sky: dk
+        ? { 'sky-color': '#0a0e16', 'horizon-color': '#2a3550', 'fog-color': '#0a0e16', 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0] }
+        : { 'sky-color': '#5fa8e8', 'horizon-color': '#cfe8fb', 'fog-color': '#eeece6', 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0] },
       layers: [
-        { id: 'fondo', type: 'background', paint: { 'background-color': C.bg } },
+        // transparente a zoom muy bajo: así se ve el cielo/atmósfera del globo en vez de un fondo plano;
+        // opaco desde zoom ~6, mucho antes de que la app opere nunca por debajo de zoom 10,5
+        { id: 'fondo', type: 'background', paint: { 'background-color': C.bg, 'background-opacity': ['interpolate', ['linear'], ['zoom'], 0, 0, 3, 0, 6, 1] } },
         { id: 'cobertura', type: 'fill', source: S, 'source-layer': 'landcover', filter: ['in', 'class', 'grass', 'wood', 'scrub'], paint: { 'fill-color': C.green, 'fill-opacity': 0.7 } },
         { id: 'parques', type: 'fill', source: S, 'source-layer': 'park', paint: { 'fill-color': C.green } },
         { id: 'agua', type: 'fill', source: S, 'source-layer': 'water', paint: { 'fill-color': C.water } },
@@ -187,7 +195,9 @@
     c.width = 28 * S; c.height = 36 * S;
     const x = c.getContext('2d'); x.scale(S, S);
     const path = new Path2D(PIN_PATH);
+    x.shadowColor = 'rgba(0,0,0,.35)'; x.shadowBlur = 2; x.shadowOffsetY = 1;
     x.fillStyle = fill; x.fill(path);
+    x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetY = 0;
     x.lineWidth = 1.6; x.strokeStyle = '#fff'; if (dashed) x.setLineDash([3, 2]); x.stroke(path);
     x.setLineDash([]); x.beginPath(); x.arc(14, 13.6, 4.6, 0, Math.PI * 2); x.fillStyle = '#fff'; x.fill();
     return x.getImageData(0, 0, c.width, c.height);
@@ -198,7 +208,10 @@
     const x = c.getContext('2d'); x.scale(S, S);
     const accent = (getComputedStyle(document.documentElement).getPropertyValue('--accent') || '#2f5bea').trim();
     x.beginPath(); x.arc(sz / 2, sz / 2, sz / 2 - 2, 0, Math.PI * 2);
-    x.fillStyle = accent; x.fill(); x.lineWidth = 2.5; x.strokeStyle = '#fff'; x.stroke();
+    x.shadowColor = 'rgba(0,0,0,.3)'; x.shadowBlur = 2; x.shadowOffsetY = 1;
+    x.fillStyle = accent; x.fill();
+    x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetY = 0;
+    x.lineWidth = 2.5; x.strokeStyle = '#fff'; x.stroke();
     x.fillStyle = '#fff'; x.font = '700 15px -apple-system, "Segoe UI", Roboto, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
     x.fillText(String(n), sz / 2, sz / 2 + 1);
     return x.getImageData(0, 0, c.width, c.height);
@@ -209,10 +222,14 @@
     else if (id.indexOf('cl-') === 0) map.addImage(id, clusterImage(id.slice(3)), { pixelRatio: 2 });
   }
 
+  // Arranca viendo la Tierra desde lejos; playGlobeIntro() baja hasta Madrid y solo entonces
+  // fija minZoom/maxBounds (si se fijaran ya, el mapa se autocorregiría y no se vería el globo).
+  const GLOBE_START_ZOOM = 1.4;
+  const GLOBE_START_BEARING = -42;   // el giro hacia 0° durante la intro da sensación de "encontrar" Madrid
   const map = new maplibregl.Map({
     container: 'map', style: makeStyle(theme),
-    center: MADRID.center, zoom: MADRID.zoom, pitch: 0, maxPitch: 60,
-    minZoom: 10.5, maxZoom: 19, maxBounds: BOUNDS, fadeDuration: 0,
+    center: MADRID.center, zoom: GLOBE_START_ZOOM, pitch: 0, bearing: GLOBE_START_BEARING, maxPitch: 60,
+    maxZoom: 19, fadeDuration: 0,
     renderWorldCopies: false, refreshExpiredTiles: false,
     pixelRatio: Math.min(window.devicePixelRatio || 1, PIXEL_RATIO_MAX),
     attributionControl: false
@@ -615,7 +632,17 @@
       msg.textContent = 'No se han podido cargar las vermuterías. ' + (err && err.message ? err.message : '');
     });
   }
-  if (map.loaded()) start(); else map.once('load', start);
+
+  // Intro: de la Tierra vista desde lejos a Madrid. Solo al terminar se fijan los límites normales
+  // del mapa y se cargan las vermuterías (así no compite con el fitBounds de setPlaces()).
+  function lockToMadrid() { map.setMinZoom(10.5); map.setMaxBounds(BOUNDS); }
+  function playGlobeIntro() {
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) { map.jumpTo(MADRID); lockToMadrid(); start(); return; }
+    map.once('moveend', () => { lockToMadrid(); start(); });
+    map.flyTo({ center: MADRID.center, zoom: MADRID.zoom, pitch: 0, bearing: 0, duration: 2800, curve: 1.3, essential: true });
+  }
+  if (map.loaded()) playGlobeIntro(); else map.once('load', playGlobeIntro);
 
   // Probar un Excel sin subirlo a GitHub (solo en este móvil)
   $('loadXlsx').addEventListener('click', () => $('file').click());

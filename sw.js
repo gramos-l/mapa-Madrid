@@ -2,15 +2,15 @@
    para que las siguientes visitas carguen casi al instante.
    La propia página, el Excel (.xlsx) y los datos (.json) se piden SIEMPRE primero a internet
    (saltándose la caché del navegador), para que veas tus cambios en cuanto los subes. */
-const SHELL = 'madrid3d-shell-v3';
+const SHELL = 'madrid3d-shell-v4';
 const TILES = 'madrid3d-tiles-v1';
 const MAX_TILES = 1500;
 
 self.addEventListener('install', e => {
   self.skipWaiting();
   e.waitUntil(caches.open(SHELL).then(c => Promise.allSettled([
-    'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.css'
+    'https://cdn.jsdelivr.net/npm/maplibre-gl@6.15.0/dist/maplibre-gl.mjs',
+    'https://cdn.jsdelivr.net/npm/maplibre-gl@6.15.0/dist/maplibre-gl.css'
   ].map(u => c.add(u)))));
 });
 
@@ -95,7 +95,7 @@ self.addEventListener('fetch', e => {
     }
   } else if (url.origin === self.location.origin) {
     e.respondWith(freshFirst(req, SHELL, 4000));
-  } else if (url.hostname === 'cdnjs.cloudflare.com') {
+  } else if (url.hostname === 'cdnjs.cloudflare.com' || url.hostname === 'cdn.jsdelivr.net') {
     e.respondWith(staleWhileRevalidate(req, SHELL));
   }
 });

@@ -20,9 +20,13 @@
   function cssColor(v) {
     if (!v) return null;
     const s = String(v).trim().toLowerCase();
-    if (/^#[0-9a-f]{6}$/.test(s)) return s;
-    if (/^#[0-9a-f]{3}$/.test(s)) return '#' + s[1] + s[1] + s[2] + s[2] + s[3] + s[3];
-    return NAMES[s.replace(/[\s_-]/g, '')] || null;
+    let hex = null;
+    if (/^#[0-9a-f]{6}$/.test(s)) hex = s;
+    else if (/^#[0-9a-f]{3}$/.test(s)) hex = '#' + s[1] + s[1] + s[2] + s[2] + s[3] + s[3];
+    else hex = NAMES[s.replace(/[\s_-]/g, '')] || null;
+    // el negro puro se ve como un agujero plano bajo la luz del mapa 3D (p. ej. algún building:colour=black real en OSM);
+    // se suaviza a un gris casi negro para que siga leyendo como "oscuro" sin convertirse en un hueco sin relieve
+    return hex === '#000000' ? '#14161a' : hex;
   }
   const MATERIAL = { glass: '#9bb4c4', brick: '#b0654a', stone: '#d8cdb4', concrete: '#c9c9c4', metal: '#b9c0c7', steel: '#b9c0c7', plaster: '#e9e2d0', wood: '#a67c52' };
   const num = v => { if (v == null) return null; const m = String(v).replace(',', '.').match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
